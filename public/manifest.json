@@ -1,0 +1,32 @@
+{
+	"name": "VideoDB",
+	"short_name": "VideoDB",
+	"description": "VideoDB app",
+	"icons": [
+		{
+			"purpose": "maskable",
+			"sizes": "512x512",
+			"src": "/icon512.png",
+			"type": "image/png"
+		},
+		{
+			"purpose": "any",
+			"sizes": "512x512",
+			"src": "/icon512.png",
+			"type": "image/png"
+		}
+	],
+	"scope": "/",
+	"start_url": "/",
+	"display": "standalone",
+	"orientation": "any",
+	"background_color": "#0f1f24",
+	"theme_color": "#091315",
+	"dir": "ltr",
+	"lang": "sk",
+	"id": "p2l_videodb",
+	"launch_handler": {
+		"client_mode": "navigate-existing"
+	},
+	"prefer_related_applications": false
+}

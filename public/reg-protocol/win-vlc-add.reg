@@ -1,0 +1,25 @@
+Windows Registry Editor Version 5.00
+
+; Define the vlcplay protocol
+[HKEY_CLASSES_ROOT\vlcplay]
+@="URL:VLC Play Protocol"
+"URL Protocol"=""
+
+; Command to play the stream in VLC
+[HKEY_CLASSES_ROOT\vlcplay\shell\open]
+@="Play in VLC"
+
+[HKEY_CLASSES_ROOT\vlcplay\shell\open\command]
+@="cmd /V:ON /c set url=%1 && call set url=%%url:~10%% && start \"\" \"C:\\Program Files\\VideoLAN\\VLC\\vlc.exe\" !url!"
+
+; Define the vlcenqueue protocol
+[HKEY_CLASSES_ROOT\vlcenqueue]
+@="URL:VLC Enqueue Protocol"
+"URL Protocol"=""
+
+; Command to enqueue the stream in VLC's playlist
+[HKEY_CLASSES_ROOT\vlcenqueue\shell\open]
+@="Enqueue in VLC"
+
+[HKEY_CLASSES_ROOT\vlcenqueue\shell\open\command]
+@="cmd /V:ON /c set url=%1 && call set url=%%url:~13%% && start \"\" \"C:\\Program Files\\VideoLAN\\VLC\\vlc.exe\" --playlist-enqueue !url!"

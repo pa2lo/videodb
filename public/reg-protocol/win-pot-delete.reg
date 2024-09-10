@@ -1,0 +1,7 @@
+Windows Registry Editor Version 5.00
+
+; Delete the potstream protocol and its subcommands
+[-HKEY_CLASSES_ROOT\potplay]
+
+; Delete the potstream protocol and its subcommands
+[-HKEY_CLASSES_ROOT\potenqueue]

@@ -1,0 +1,25 @@
+Windows Registry Editor Version 5.00
+
+; Define the potstream protocol
+[HKEY_CLASSES_ROOT\potplay]
+@="URL:PotPlayer Stream Protocol"
+"URL Protocol"=""
+
+; Command for 'play' operation
+[HKEY_CLASSES_ROOT\potplay\shell\open]
+@="Play in PotPlayer"
+
+[HKEY_CLASSES_ROOT\potplay\shell\open\command]
+@="cmd /V:ON /c set url=%1 && call set url=%%url:~10%% && start \"\" \"C:\\Program Files\\DAUM\\PotPlayer\\PotPlayerMini64.exe\" !url!"
+
+; Define the potstream protocol
+[HKEY_CLASSES_ROOT\potenqueue]
+@="URL:PotPlayer Stream Protocol"
+"URL Protocol"=""
+
+; Command for 'enqueue' operation
+[HKEY_CLASSES_ROOT\potenqueue\shell\open]
+@="Enqueue in PotPlayer"
+
+[HKEY_CLASSES_ROOT\potenqueue\shell\open\command]
+@="cmd /V:ON /c set url=%1 && call set url=%%url:~13%% && start \"\" \"C:\\Program Files\\DAUM\\PotPlayer\\PotPlayerMini64.exe\" /add !url!"
