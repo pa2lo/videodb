@@ -58,7 +58,6 @@ onMounted(async () => {
 			ts
 		}
 
-		console.log(page)
 		loading.value = false
 		content.value = page
 	}

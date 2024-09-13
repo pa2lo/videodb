@@ -332,17 +332,13 @@ async function getHomePage(reload) {
 		appState.loading = false
 	})
 }
+
 async function getUrlContent(url, customUrl) {
 	let destination = customUrl ? customUrl : url
 	if (!destination?.startsWith(PLUGIN_URL)) destination = url?.includes('&uid=') ? `${PLUGIN_URL}/${url}` : `${PLUGIN_URL}/${url}${url.includes('?') ? '&' : '?'}${queryParam.value}`
 
-	let linkController = new AbortController()
-	let linkTimeout = setTimeout(() => linkController.abort(), 10000)
-
-	const response = await fetch(destination, { signal: linkController.signal })
+	const response = await fetch(destination, { signal: AbortSignal.timeout(10000) })
 	const page = await response.json()
-
-	if (linkTimeout) clearTimeout(linkTimeout)
 
 	if (!page?.menu?.length) {
 		appState.loading = false
@@ -362,7 +358,7 @@ async function getUrlContent(url, customUrl) {
 async function refreshPage() {
 	if (currentHistoryIndex.value == 0) return window.location.reload()
 
-	if (!currentPage.value.url) return
+	if (!currentPage.value.url || appState.loading) return
 
 	appState.loading = true
 
@@ -372,8 +368,7 @@ async function refreshPage() {
 
 		currentPage.value.data = page
 	} catch (error) {
-		showToast(error.name == 'AbortError' ? t('Request timeout') : t('Error loading data'))
-		console.log(error)
+		reportFetchError(error)
 	} finally {
 		appState.loading = false
 	}
@@ -383,7 +378,7 @@ async function visitLink(link, url) {
 	if (link?.action == 'generator') return showGeneratorPage()
 
 	if (link?.url && currentItemInfo.value?.url != link.url) setCurrentItemInfo(link)
-	if (ignoreMouseEnter) return
+	if (ignoreMouseEnter || appState.loading) return
 
 	if (showInfoModal.value) showInfoModal.value = false
 
@@ -405,12 +400,9 @@ async function visitLink(link, url) {
 			ts: Date.now()
 		}
 
-		console.log(page)
-
 		pushToHistory()
 	} catch (error) {
-		showToast(error.name == 'AbortError' ? t('Request timeout') : t('Error loading data'))
-		console.log(error)
+		reportFetchError(error)
 	} finally {
 		appState.loading = false
 	}
@@ -424,6 +416,10 @@ function visitLinkFromHome(link, url) {
 		return windowHistory.go(-currentHistoryIndex.value)
 	}
 	visitLink(link, url)
+}
+function reportFetchError(error) {
+	showToast(t(error?.name == 'TimeoutError' ? 'Request timeout' : 'Error loading data'))
+	console.log(error)
 }
 
 // download
@@ -843,18 +839,16 @@ function getCurrentFocusableItem() {
 	return mainEl.value.querySelector('.isCurrentLR') || mainEl.value.querySelector('.isCurrent')
 }
 let downloadController = null
-let downloadTimeout = null
 async function getDownloadLink(url) {
 	try {
 		if (downloadController) {
 			downloadController.abort()
 			await nextTick()
 		}
-		if (downloadTimeout) clearTimeout(downloadTimeout)
 
 		downloadController = new AbortController()
-		downloadTimeout = setTimeout(() => downloadController?.abort(), 10000)
-		const response = await fetch(`${PLUGIN_URL}/${url}?${queryParam.value}`, { signal: downloadController.signal });
+
+		const response = await fetch(`${PLUGIN_URL}/${url}?${queryParam.value}`, { signal: AbortSignal.any([downloadController.signal, AbortSignal.timeout(10000)]) });
 		const id = await response.json()
 		if (!id?.ident) {
 			downloadStreams.error = t('Error loading ID')
@@ -865,13 +859,10 @@ async function getDownloadLink(url) {
 			method: 'POST',
 			headers: {'Content-Type': 'application/json'},
 			body: `{"session_id":"${token.value}","data":{"ident":"${id.ident}"}}`,
-			signal: downloadController.signal
+			signal: AbortSignal.any([downloadController.signal, AbortSignal.timeout(10000)])
 		}
 
 		if (token.value == 'demoToken123456789') return showToast('Not available with demo token!')
-
-		clearTimeout(downloadTimeout)
-		downloadTimeout = setTimeout(() => downloadController?.abort(), 10000)
 
 		const response2 = await fetch(`${SERVICE_URL}/file/download`, options)
 		const res = await response2.json()
@@ -882,15 +873,13 @@ async function getDownloadLink(url) {
 
 		return res.data.link
 	} catch (error) {
-		if (error.name == 'AbortError') {
-			downloadStreams.show ? downloadStreams.error = t('Request timeout') : showToast(t('Request timeout'))
-			return null
+		if (error?.name == 'TimeoutError') downloadStreams.show ? downloadStreams.error = t('Request timeout') : showToast(t('Request timeout'))
+		else if (error?.name != 'AbortError') {
+			console.log(error)
+			showToast(t('Error loading data'))
 		}
-		console.log(error)
-		showToast(t('Error loading data'))
 		return null
 	} finally {
-		if (downloadTimeout) clearTimeout(downloadTimeout)
 		if (downloadController) downloadController = null
 	}
 }
