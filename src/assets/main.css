@@ -922,9 +922,12 @@ button:not(.basicIcon, .posterButton-info) :is(.fa-solid, .fa-regular) {
 .downloadModal-link:not(:last-child) {
 	border-bottom: 1px solid var(--border1);
 }
-.downloadModal-linkTitle {
+.downloadModal-linkTitle, .downloadModal-episodeTitle {
 	gap: .5rem;
 	min-height: 2rem;
+}
+.downloadModal-episodeTitle {
+	place-content: center;
 }
 .downloadModal-linkTitle, .downloadModal-linkTitle-text, .downloadModal-episodeTitle {
 	flex: 1;

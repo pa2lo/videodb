@@ -1330,9 +1330,16 @@ function afterImport() {
 					<DownloadLink v-for="streamLink in downloadStreams.data.strms" :loading="downloadStreams.loadingLink == streamLink.url" class="isFocusable" :link="streamLink" :isSupportedOs :isDesktopOs :current="downloadStreams.current?.url == streamLink.url" @downloadFile="downloadFile" @copyFileLink="copyFileLink" @pointerenter="downloadStreams.current = streamLink">
 						<strong>{{ streamLink.size }}</strong> - {{ streamLink.quality }} <span class="light"><span class="downloadModal-streamInfoPC">{{ streamLink.vinfo }}{{ streamLink.ainfo }}</span><span class="downloadModal-streamInfoMobile">{{ streamLink.linfo?.join(', ').toUpperCase() }}</span></span>
 					</DownloadLink>
-					<div v-if="currentPage?.data?.system?.setContent == 'episodes'" class="downloadModal-episodeInfo flex ai-c">
-						<div class="downloadModal-episodeTitle">{{ String(currentItemInfo?.info?.season).padStart(2, 0) }}x{{ String(currentItemInfo?.info?.episode).padStart(2, 0) }} - {{ currentItemInfo?.i18n_info?.[lang]?.epname }}</div>
-						<div class="downloadModal-linkButtons">
+					<div class="downloadModal-episodeInfo flex ai-c">
+						<div class="downloadModal-episodeTitle">
+							<template v-if="currentPage?.data?.system?.setContent == 'episodes'">
+								<strong>{{ String(currentItemInfo?.info?.season).padStart(2, 0) }}x{{ String(currentItemInfo?.info?.episode).padStart(2, 0) }} - {{ currentItemInfo?.i18n_info?.[lang]?.epname }}</strong>
+							</template>
+							<template v-else>
+								<strong>{{ currentItemInfo?.i18n_info?.[lang]?.otitle }}</strong> <span v-if="currentItemInfo?.info?.year" class="light">({{ currentItemInfo.info.year }})</span>
+							</template>
+						</div>
+						<div v-if="currentPage?.data?.system?.setContent == 'episodes'" class="downloadModal-linkButtons">
 							<BButton basicIcon smaller icon="fa-solid fa-chevron-left" :disabled="currentItemInfo.isFirst" :title="t('Previous episode')" @click="findNextMedia(false, true)" />
 							<BButton basicIcon smaller icon="fa-solid fa-chevron-right" :disabled="currentItemInfo.isLast" :title="t('Next episode')" @click="findNextMedia(true, true)" />
 						</div>
