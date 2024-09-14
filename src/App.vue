@@ -494,6 +494,18 @@ function setNextStreamAsCurrent(down) {
 	let currentIndex = downloadStreams.data.strms.findIndex(stream => stream.url == downloadStreams.current?.url)
 	let nextIndex = down ? (currentIndex + 1) % downloadStreams.data.strms.length : (Math.max(currentIndex, 0) - 1 + downloadStreams.data.strms.length) % downloadStreams.data.strms.length
 	downloadStreams.current = downloadStreams.data.strms[nextIndex]
+
+	requestAnimationFrame(() => {
+		let currentDownloadLink = document.querySelector('.modal .downloadModal-link.isCurrent')
+		if (currentDownloadLink) {
+			const { top, bottom } = currentDownloadLink.getBoundingClientRect()
+
+			if (top < 0 || bottom > window.innerHeight) currentDownloadLink.scrollIntoView({
+				behavior: 'smooth',
+				block: 'center'
+			})
+		}
+	})
 }
 
 // viewed history
@@ -1006,8 +1018,10 @@ function onMainKeydown(e) {
 	}
 }
 function onDownloadModalKeydown(e) {
-	if (downloadStreams.data?.strms?.length && (e.code == 'ArrowDown' || e.code == 'ArrowUp')) setNextStreamAsCurrent(e.code == 'ArrowDown')
-	else if (currentPage.value?.data?.system?.setContent == 'episodes' && (e.code == 'ArrowRight' || e.code == 'ArrowLeft')) findNextMedia(e.code == 'ArrowRight', true)
+	if (downloadStreams.data?.strms?.length && (e.code == 'ArrowDown' || e.code == 'ArrowUp')) {
+		e.preventDefault()
+		setNextStreamAsCurrent(e.code == 'ArrowDown')
+	} else if (currentPage.value?.data?.system?.setContent == 'episodes' && (e.code == 'ArrowRight' || e.code == 'ArrowLeft')) findNextMedia(e.code == 'ArrowRight', true)
 	else if (e.code == 'KeyW') removeFromDownloadHistory(currentItemInfo.value?.url)
 	else if (downloadStreams.current) {
 		if (e.key == 'Enter') downloadFile(downloadStreams.current, isSupportedOs)
