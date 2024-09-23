@@ -284,7 +284,7 @@ button:focus, .button:focus {
 	width: 2.25rem;
 }
 
-button:not(.basicIcon, .posterButton-info) :is(.fa-solid, .fa-regular) {
+button:not(.basicIcon, .posterButton-info) :is(.fa-solid, .fa-regular, .fa-brands) {
 	width: 1.125rem;
 	width: auto;
 	font-size: 1.125rem;
@@ -752,11 +752,8 @@ button:not(.basicIcon, .posterButton-info) :is(.fa-solid, .fa-regular) {
 .movieInfo-title {
 	margin-bottom: .375rem;
 }
-.movieInfo-meta {
-	flex-wrap: wrap;
-}
 .movieInfo-meta span:not(:last-child) {
-	margin-right: .5rem;
+	margin-right: .25rem;
 }
 .movieInfo-meta span:not(:first-child)::before {
 	content: ' | ';
@@ -889,6 +886,7 @@ button:not(.basicIcon, .posterButton-info) :is(.fa-solid, .fa-regular) {
 	position: absolute;
 	right: 0.25rem;
 	top: 0.25rem;
+	z-index: 1;
 }
 .modal-button {
 	font-size: 1.25em;
@@ -1229,6 +1227,27 @@ button:not(.basicIcon, .posterButton-info) :is(.fa-solid, .fa-regular) {
 }
 .modal-movieInfo-arrows .buttonLeft:not(:disabled) {
 	transform: translateX(max(0px, var(--off-x, 0) * .2px));
+}
+
+.movieDB-modal .modal-cont {
+	height: 100%;
+	display: flex;
+	flex-direction: column;
+}
+.movieDB-modal iframe {
+	border: none;
+	width: 100%;
+	flex: 1;
+}
+
+.trailer-modal .modal-cont {
+	width: fit-content;
+	max-height: 100%;
+}
+.trailer {
+	max-height: 100%;
+	max-width: 100%;
+	display: block;
 }
 
 /* install */

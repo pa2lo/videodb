@@ -13,7 +13,7 @@ const props = defineProps({
 	isGeneratorSubpage: Boolean
 })
 
-const emit = defineEmits(['findNextMedia', 'removeFromDownloadHistory', 'showDownload', 'visitLink', 'searchPerson', 'toggleFav'])
+const emit = defineEmits(['findNextMedia', 'removeFromDownloadHistory', 'showDownload', 'visitLink', 'searchPerson', 'toggleFav', 'showMovieDBSite', 'showTrailer'])
 
 let eventsAdded = false
 let start = {
@@ -77,7 +77,7 @@ onBeforeUnmount(() => {
 		</div>
 		<h2 v-if="currentPage?.data?.system?.setContent == 'episodes'" class="movieInfo-title">{{ String(currentItemInfo.info.season || 0).padStart(2, 0) }}x{{ String(currentItemInfo.info.episode).padStart(2, 0) }} - {{ currentItemInfo.i18n_info[lang].epname }}</h2>
 		<h2 v-else class="movieInfo-title">{{ currentItemInfo.i18n_info[lang].otitle }}<span v-if="currentPage?.data?.system?.setContent == 'seasons'"> - {{ t('Season') }} {{ String(currentItemInfo.info.season).padStart(2, 0) }}</span></h2>
-		<div class="movieInfo-meta flex light">
+		<div class="movieInfo-meta light">
 			<span v-if="currentItemInfo.i18n_info[lang].genre" class="movieInfo-year">{{ currentItemInfo.i18n_info[lang].genre.join(', ') }}</span>
 			<span v-if="currentItemInfo.info.year" class="movieInfo-year">{{ currentItemInfo.info.year }}</span>
 			<span v-if="currentItemInfo.stream_info.langs" class="movieInfo-country">{{ Object.keys(currentItemInfo.stream_info.langs).slice(0, 3).join(', ') }}</span>
@@ -114,9 +114,10 @@ onBeforeUnmount(() => {
 		<div class="movieInfo-buttons">
 			<BButton v-if="currentItemInfo.type != 'dir'" class="buttonSticky" :icon="isSupportedOs ? 'fa-solid fa-play' : 'fa-solid fa-download'" @click="$emit('showDownload', currentItemInfo)">{{ t(isSupportedOs ? 'Play' : 'Download') }}</BButton>
 			<BButton v-else-if="currentItemInfo.type == 'dir'" class="buttonSticky" icon="fa-regular fa-folder-open" @click="$emit('visitLink', currentItemInfo)">{{ t('Open') }}</BButton>
-			<div v-if="currentItemInfo.unique_ids.csfd || currentItemInfo.unique_ids.imdb" class="movieInfo-buttonsInner">
-				<BButton v-if="currentItemInfo.unique_ids.csfd" dark iconRight="fa-solid fa-arrow-up-right-from-square" :href="`https://www.csfd.cz/film/${currentItemInfo.unique_ids.csfd}`" target="_blank">CSFD</BButton>
-				<BButton v-if="currentItemInfo.unique_ids.imdb" dark iconRight="fa-solid fa-arrow-up-right-from-square" :href="`https://www.imdb.com/title/${currentItemInfo.unique_ids.imdb}/`" target="_blank">IMDB</BButton>
+			<div v-if="currentItemInfo.unique_ids.csfd || currentItemInfo.unique_ids.imdb || currentItemInfo.info.trailer" class="movieInfo-buttonsInner">
+				<BButton v-if="currentItemInfo.unique_ids.csfd" dark @click.prevent="$emit('showMovieDBSite', 'csfd', currentItemInfo.unique_ids.csfd)">CSFD</BButton>
+				<BButton v-if="currentItemInfo.unique_ids.imdb" dark @click.prevent="$emit('showMovieDBSite', 'imdb', currentItemInfo.unique_ids.imdb)">IMDB</BButton>
+				<BButton v-if="currentItemInfo.info.trailer" dark icon="fa-brands fa-youtube" @click.prevent="$emit('showTrailer', currentItemInfo.info.trailer)">Trailer</BButton>
 			</div>
 		</div>
 	</div>

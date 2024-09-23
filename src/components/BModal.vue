@@ -143,7 +143,7 @@ onBeforeUnmount(() => {
 					<slot name="buttons"></slot>
 					<BButton class="modal-button" @click="open = false">✕</BButton>
 				</div>
-				<h3 class="modal-title">{{ title }}</h3>
+				<h3 v-if="title" class="modal-title">{{ title }}</h3>
 				<slot />
 			</div>
 		</div>

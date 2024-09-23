@@ -82,6 +82,16 @@ const generatorShowsData = shallowReactive({
 	url: null
 })
 
+const csfdFrame = shallowReactive({
+	show: false,
+	src: null
+})
+
+const trailerData = shallowReactive({
+	show: false,
+	src: null
+})
+
 // element refs
 const searchInputEl = ref(null)
 const mainEl = ref(null)
@@ -740,6 +750,27 @@ function scrollCurrent(behavior = 'smooth') {
 	}
 }
 
+// movie DB Sites
+function showMovieDBSite(site, id) {
+	if (!site || !id) return
+	if (site == 'csfd') {
+		csfdFrame.src = `https://www.csfd.${navigator.language.startsWith('sk') ? 'sk' : 'cz'}/film/${id}`
+		csfdFrame.show = true
+	} else {
+		const imdbLink = Object.assign(document.createElement('a'), {
+			target: '_blank',
+			href: `https://www.imdb.com/title/${id}/`
+		})
+		imdbLink.click()
+	}
+}
+
+// trailer
+function showTrailer(url) {
+	trailerData.src = url
+	trailerData.show = true
+}
+
 // login logout
 onBeforeMount(() => {
 	if (tokenDate.value && (Date.now() - tokenDate.value > 86400000)) {
@@ -747,7 +778,7 @@ onBeforeMount(() => {
 		appState.autoLogin = true
 	} else if (token.value) getHomePage()
 
-	if (!token.value && window.location.hash == '#demoToken') {
+	if (!token.value && window.location.hash == '#demo') {
 		token.value = 'demoToken123456789'
 		tokenDate.value = 1600000000000
 		getHomePage()
@@ -917,15 +948,6 @@ function getSystemLink(url, playLink, enqueue) {
 	else if (isWindows && winPlayer.value == 'pot') return `potplayer://${url}${enqueue ? ' /add' : ''}`
 	else if (isWindows && winPlayer.value == 'vlc') return `${enqueue ? 'vlcenqueue' : 'vlcplay'}://${url}`
 }
-function showMovieSite(id, site) {
-	if (!id) return
-
-	const alink = Object.assign(document.createElement('a'), {
-		target: '_blank',
-		href: site == 'csfd' ? `https://www.csfd.cz/film/${id}` : `https://www.imdb.com/title/${id}/`
-	})
-	alink.click()
-}
 function getLinkData(link, url) {
 	return {
 		cast: link?.cast ? link.cast.slice(0, 7) : null,
@@ -967,7 +989,8 @@ function getLinkData(link, url) {
 			director: link?.info?.director ? link.info.director.slice(0, 6) : null,
 			mpaa: link?.info?.mpaa || null,
 			rating: link?.info?.rating || null,
-			year: link?.info?.year || null
+			year: link?.info?.year || null,
+			trailer: link?.info?.trailer || null
 		},
 		stream_info: {
 			langs: link?.stream_info?.langs || null,
@@ -987,8 +1010,8 @@ function getLinkData(link, url) {
 
 // main key events
 function onInfoKeydown(e) {
-	if (e.code == 'KeyC') showMovieSite(currentItemInfo.value?.unique_ids?.csfd, 'csfd')
-	else if (e.code == 'KeyM') showMovieSite(currentItemInfo.value?.unique_ids?.imdb, 'imdb')
+	if (e.code == 'KeyC' && !e.metaKey && !e.ctrlKey) showMovieDBSite('csfd', currentItemInfo.value?.unique_ids?.csfd)
+	else if (e.code == 'KeyM') showMovieDBSite('imdb', currentItemInfo.value?.unique_ids?.imdb)
 	else if (e.code == 'KeyW') removeFromDownloadHistory(currentItemInfo.value?.url)
 	else if (e.code == 'KeyF') toggleFav()
 	else if (e.code == 'ArrowRight' || e.code == 'ArrowLeft') findNextMedia(e.code == 'ArrowRight')
@@ -1006,8 +1029,8 @@ function onMainKeydown(e) {
 	} else {
 		if (e.code == 'KeyI') showCurrentItemInfo()
 		else if (e.code == 'KeyB' && !e.metaKey && !e.ctrlKey) toggleBookmark()
-		else if (e.code == 'KeyC' && !e.metaKey && !e.ctrlKey) showMovieSite(currentItemInfo.value?.unique_ids?.csfd, 'csfd')
-		else if (e.code == 'KeyM') showMovieSite(currentItemInfo.value?.unique_ids?.imdb, 'imdb')
+		else if (e.code == 'KeyC' && !e.metaKey && !e.ctrlKey) showMovieDBSite('csfd', currentItemInfo.value?.unique_ids?.csfd)
+		else if (e.code == 'KeyM') showMovieDBSite('imdb', currentItemInfo.value?.unique_ids?.imdb)
 		else if (e.code == 'KeyW') removeFromDownloadHistory(currentItemInfo.value?.url)
 		else if (e.code == 'KeyF') toggleFav()
 		else if (e.key == 'Enter') mainCurrentClick()
@@ -1327,6 +1350,8 @@ function afterImport() {
 					@findNextMedia="findNextMedia"
 					@searchPerson="searchPerson"
 					@toggleFav="toggleFav"
+					@showMovieDBSite="showMovieDBSite"
+					@showTrailer="showTrailer"
 				/>
 				<div v-else class="searchCont">{{ t('No informations') }}</div>
 			</BModal>
@@ -1449,6 +1474,12 @@ function afterImport() {
 						<img src="/img/step3.png" class="smallerLine" alt="" />
 					</div>
 				</div>
+			</BModal>
+			<BModal v-model:open="csfdFrame.show" wider title="CSFD" class="movieDB-modal">
+				<iframe :src="csfdFrame.src" referrerpolicy="no-referrer"></iframe>
+			</BModal>
+			<BModal v-model:open="trailerData.show" wider class="trailer-modal">
+				<video class="trailer" :src="trailerData.src" controls autoplay playsinline></video>
 			</BModal>
 		</div>
 		<div v-else class="loginScreen">
