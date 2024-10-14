@@ -100,6 +100,7 @@ const mainEl = ref(null)
 const showSettingsModal = ref(false)
 const showInfoModal = ref(false)
 const showHelpModal = ref(false)
+const showCurrentSortModal = ref(false)
 
 // install
 const installPromptCancelled = ref(localStorage.getItem('installClosed'))
@@ -154,11 +155,15 @@ function onPopState(e) {
 }
 
 // sort
+function setCurrentSortBy(by) {
+	currentPage.value.sortBy = by
+	showCurrentSortModal.value = false
+}
 const sortedList = computed(() => {
-	let reducetArr = []
+	let reducedArr = []
 	if (currentPage.value?.data?.system?.setContent == 'movies') {
 		let reducedIds = []
-		reducetArr = Object.values(currentPage.value?.data?.menu.reduce((acc, current) => {
+		reducedArr = Object.values(currentPage.value?.data?.menu.reduce((acc, current) => {
 			let key = current.id || current.url
 			if (!reducedIds.includes(key)) {
 				reducedIds.push(key)
@@ -166,30 +171,37 @@ const sortedList = computed(() => {
 			}
 			return acc
 		}, []))
-	} else reducetArr = currentPage.value?.data?.menu
+	} else reducedArr = currentPage.value?.data?.menu
 
-	let reducetArr2
-	if (listsort.value == '') reducetArr2 = reducetArr
-	else if (listsort.value == 'rating') reducetArr2 = reducetArr.toSorted((a, b) => {
+	let reducedArr2
+	let sortBy = currentPage.value?.sortBy || listsort.value
+	if (sortBy == '') reducedArr2 = reducedArr
+	else if (sortBy == 'rating') reducedArr2 = reducedArr.toSorted((a, b) => {
 		let ra = a?.info?.rating ?? 0
 		let rb = b?.info?.rating ?? 0
 		if (ra > 0 && ra < 1) ra * 10
 		if (rb > 0 && rb < 1) rb * 10
 		return rb - ra
 	})
-	else if (listsort.value == 'year') reducetArr2 = reducetArr.toSorted((a, b) => {
-		let ra = a?.info?.year ?? 0
-		let rb = b?.info?.year ?? 0
-		return rb - ra
-	})
-	else if (listsort.value == 'duration') reducetArr2 = reducetArr.toSorted((a, b) => {
-		let ra = a?.info?.duration ?? 0
-		let rb = b?.info?.duration ?? 0
-		return rb - ra
-	})
+	else if (sortBy == 'newest' || sortBy == 'oldest') {
+		let defaultLength = sortBy == 'newest' ? 0 : 2100
+		reducedArr2 = reducedArr.toSorted((a, b) => {
+			let ra = a?.info?.year ?? defaultLength
+			let rb = b?.info?.year ?? defaultLength
+			return sortBy == 'newest' ? rb - ra : ra - rb
+		})
+	}
+	else if (sortBy == 'longest' || sortBy == 'shortest') {
+		let defaultLength = sortBy == 'longest' ? 0 : 999999999
+		reducedArr2 = reducedArr.toSorted((a, b) => {
+			let ra = a?.info?.duration ?? defaultLength
+			let rb = b?.info?.duration ?? defaultLength
+			return sortBy == 'longest' ? rb - ra : ra - rb
+		})
+	}
 
-	let l = reducetArr2.length
-	return reducetArr2.map((item, index, arr) => {
+	let l = reducedArr2.length
+	return reducedArr2.map((item, index, arr) => {
 		if (index == 0) item.isFirst = true
 		if ((index == l-1 && item?.type != 'next') || (index == l-2 && arr[index+1]?.type == 'next')) item.isLast = true
 		return item
@@ -291,11 +303,12 @@ const isGeneratorSubpage = computed(() => {
 })
 function getFilterFromTo() {
 	if (!currentPage.value?.data?.filter) return ''
-	if (currentPage.value.data.filter.page == 1 && currentPage.value.data.filter.limit >= currentPage.value.data.filter.meta.total) return currentPage.value.data.filter.meta.total
+
+	if (currentPage.value.data.filter.page == 1 && currentPage.value.data.filter.limit >= currentPage.value.data.filter.meta.total_found) return currentPage.value.data.filter.meta.total_found
 
 	let from = currentPage.value.data.filter.page == 1 ? 1 : (parseInt(currentPage.value.data.filter.page) - 1) * parseInt(currentPage.value.data.filter.limit)
 	let to = parseInt(currentPage.value.data.filter.limit) * parseInt(currentPage.value.data.filter.page)
-	let total = parseInt(currentPage.value.data.filter.meta.total)
+	let total = parseInt(currentPage.value.data.filter.meta.total_found)
 	if (total < to) to = total
 
 	return `${from}-${to} / ${total}`
@@ -304,8 +317,11 @@ function setHistoryContent(index) {
 	if (!customHistory.value.length) return
 	if (showInfoModal.value) showInfoModal.value = false
 	if (downloadStreams.show) downloadStreams.show = false
+	if (showCurrentSortModal.value) showCurrentSortModal.value = false
 	if (searchData.show) searchData.show = false
 	if (searchData.optionsShow) searchData.optionsShow = false
+	if (trailerData.show) trailerData.show = false
+	if (csfdFrame.show) csfdFrame.show = false
 
 	appState.loading = true
 
@@ -1116,19 +1132,20 @@ function afterImport() {
 							<div v-if="(currentPage.data?.filter?.page && currentPage.data?.filter?.page != 1) || (currentPage.data?.system?.setContent == 'episodes' && customHistory.at(currentHistoryIndex - 1)?.page?.data?.system?.setContent == 'seasons')" class="pageTitle-textPre">{{ breadCrumbs.findLast(b => b.isInvisible == false)?.title[lang] }} -&nbsp;</div>
 							<div class="pageTitle-text" v-html="reformatString(currentPage?.title?.[lang] || '')"></div>
 							<div v-if="['movies', 'tvshows'].includes(currentPage?.data?.system?.setContent)" class="pageTitle-info">
-								<template v-if="currentPage?.data?.filter?.meta?.total">{{ getFilterFromTo() }}</template>
+								<template v-if="currentPage?.data?.filter?.meta?.total_found">{{ getFilterFromTo() }}</template>
 								<template v-else-if="sortedList.length">{{ sortedList.length }}</template>
 							</div>
-							<div v-else-if="['episodes', 'seasons'].includes(currentPage?.data?.system?.setContent) && currentPage?.data?.filter && currentPage?.data?.filter?.meta?.total" class="pageTitle-info">{{ currentPage.data.filter.meta.total }}</div>
+							<div v-else-if="['episodes', 'seasons'].includes(currentPage?.data?.system?.setContent) && currentPage?.data?.filter && currentPage?.data?.filter?.meta?.total_found" class="pageTitle-info">{{ currentPage.data.filter.meta.total_found }}</div>
 						</div>
 					</Transition>
 				</div>
 				<div class="header-buttons-outer flex">
 					<BButton dark smaller icon="fa-solid fa-ellipsis-vertical" class="header-more buttonUnstyled" :title="t('Menu')" @click="$event.target.closest('button')?.focus()" @focus="null" />
 					<div class="header-buttons flex ai-c">
+						<BButton dark smaller class="buttonUnstyled" :class="{isSorted: currentPage?.sortBy}" icon="fa-solid fa-arrow-down-short-wide" :disabled="!['movies', 'tvshows'].includes(currentPage?.data?.system?.setContent)" @click.prevent="showCurrentSortModal = true" :title="t('List sort')" />
 						<BButton dark smaller class="buttonUnstyled" :icon="isInBookmarks ? 'fa-solid fa-bookmark' : 'fa-regular fa-bookmark'" :disabled="!currentPage?.url" @click.prevent="toggleBookmark" :title="isInBookmarks ? t('Remove from bookmarks') : t('Add to bookmarks')" />
-						<BButton dark smaller class="buttonUnstyled" icon="fa-solid fa-search" :title="t('Search')" @click="showSearchOptions" />
 						<BButton dark smaller class="buttonUnstyled" icon="fa-solid fa-arrows-rotate" @click.prevent="refreshPage" :title="t('Refresh page')" />
+						<BButton dark smaller class="buttonUnstyled" icon="fa-solid fa-search" :title="t('Search')" @click="showSearchOptions" />
 						<BButton v-if="installPrompt || iOsInstallPrompt" class="buttonUnstyled" dark smaller icon="fa-solid fa-cloud-arrow-down" :title="t('Download App')" @click.prevent="installApp" />
 						<BButton dark smaller class="buttonUnstyled" icon="fa-solid fa-gear" :title="t('Settings')" @click.prevent="showSettingsModal = true" />
 						<BButton dark smaller class="buttonUnstyled" icon="fa-solid fa-question" :title="t('Help')" @click.prevent="showHelpModal = true" />
@@ -1231,6 +1248,8 @@ function afterImport() {
 									@findNextMedia="findNextMedia"
 									@searchPerson="searchPerson"
 									@toggleFav="toggleFav"
+									@showMovieDBSite="showMovieDBSite"
+									@showTrailer="showTrailer"
 								 />
 							</Transition>
 						</div>
@@ -1385,6 +1404,26 @@ function afterImport() {
 					</div>
 				</div>
 			</BModal>
+			<BModal v-model:open="showCurrentSortModal" narrow :title="t('List sort')">
+				<div class="downloadModal-link flex ai-c isHoverable" :class="{isActive: !currentPage.sortBy}" @click="setCurrentSortBy('')">
+					<div class="downloadModal-linkTitle flex ai-c">{{ t('Default') }}</div>
+				</div>
+				<div class="downloadModal-link flex ai-c isHoverable" :class="{isActive: currentPage?.sortBy == 'rating'}" @click="setCurrentSortBy('rating')">
+					<div class="downloadModal-linkTitle flex ai-c">{{ t('Rating') }}</div>
+				</div>
+				<div class="downloadModal-link flex ai-c isHoverable" :class="{isActive: currentPage?.sortBy == 'newest'}" @click="setCurrentSortBy('newest')">
+					<div class="downloadModal-linkTitle flex ai-c">{{ t('Newest') }}</div>
+				</div>
+				<div class="downloadModal-link flex ai-c isHoverable" :class="{isActive: currentPage?.sortBy == 'oldest'}" @click="setCurrentSortBy('oldest')">
+					<div class="downloadModal-linkTitle flex ai-c">{{ t('Oldest') }}</div>
+				</div>
+				<div class="downloadModal-link flex ai-c isHoverable" :class="{isActive: currentPage?.sortBy == 'longest'}" @click="setCurrentSortBy('longest')">
+					<div class="downloadModal-linkTitle flex ai-c">{{ t('Longest') }}</div>
+				</div>
+				<div class="downloadModal-link flex ai-c isHoverable" :class="{isActive: currentPage?.sortBy == 'shortest'}" @click="setCurrentSortBy('shortest')">
+					<div class="downloadModal-linkTitle flex ai-c">{{ t('Shortest') }}</div>
+				</div>
+			</BModal>
 			<BModal v-model:open="searchData.genreSearchShow" narrow :title="`${t('Search')} ${searchIdMap['by-genre'][lang]}`">
 				<form class="searchCont" @submit.prevent="doSearchByGenre">
 					<div class="blockLabel line">
@@ -1402,13 +1441,13 @@ function afterImport() {
 					</div>
 					<label class="blockLabel line">
 						<span class="blockLabel-label">{{ t('Genre') }}</span>
-						<select name="listsort" class="select isFull" v-model="searchData.genre">
+						<select class="select isFull" v-model="searchData.genre">
 							<option v-for="(option, key) in genresMap" :value="key">{{ option[lang] }}</option>
 						</select>
 					</label>
 					<label class="blockLabel line">
 						<span class="blockLabel-label">{{ t('Order') }}</span>
-						<select name="listsort" class="select isFull" v-model="searchData.genreOrder">
+						<select class="select isFull" v-model="searchData.genreOrder">
 							<option value="rating">{{ t('Rating') }}</option>
 							<option value="random">{{ t('Random') }}</option>
 							<option value="name">{{ t('Name') }}</option>

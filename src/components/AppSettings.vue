@@ -116,12 +116,14 @@ function importData() {
 <template>
 	<div class="searchCont">
 		<label class="blockLabel line">
-			<span class="blockLabel-label">{{ t('List order') }}</span>
+			<span class="blockLabel-label">{{ t('List sort') }}</span>
 			<select name="listsort" class="select isFull" v-model="listsort">
 				<option value="">{{ t('Default') }}</option>
 				<option value="rating">{{ t('Rating') }}</option>
-				<option value="year">{{ t('Year') }}</option>
-				<option value="duration">{{ t('Length') }}</option>
+				<option value="newest">{{ t('Newest') }}</option>
+				<option value="oldest">{{ t('Oldest') }}</option>
+				<option value="longest">{{ t('Longest') }}</option>
+				<option value="shortest">{{ t('Shortest') }}</option>
 			</select>
 		</label>
 		<div class="blockLabel line">

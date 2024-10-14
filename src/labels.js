@@ -68,11 +68,15 @@ const labels = {
 		"Video removed from watch list": "Video odobrané zo zoznamu videných",
 
 		// settings
-		"List order": "Zoradenie zoznamu",
+		"List sort": "Zoradenie zoznamu",
 		"Default": "Predvolené",
 		"Rating": "Hodnotenie",
 		"Year": "Rok",
+		"Oldest": "Najstaršie",
+		"Newest": "Najnovšie",
 		"Length": "Dĺžka",
+		"Shortest": "Najkratšie",
+		"Longest": "Najdlhšie",
 		"Language": "Jazyk",
 		"Theme": "Téma",
 		"Dark": "Tmavá",
@@ -195,11 +199,15 @@ const labels = {
 		"Video removed from watch list": "Video odebrané ze seznamu viděných",
 
 		// settings
-		"List order": "Seřazení seznamu",
+		"List sort": "Seřazení seznamu",
 		"Default": "Výchozí",
 		"Rating": "Hodnocení",
 		"Year": "Rok",
+		"Oldest": "Nejstarší",
+		"Newest": "Nejnovější",
 		"Length": "Délka",
+		"Shortest": "Nejkratší",
+		"Longest": "Nejdelší",
 		"Language": "Jazyk",
 		"Theme": "Téma",
 		"Dark": "Tmavá",

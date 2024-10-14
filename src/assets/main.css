@@ -231,6 +231,7 @@ button, .button {
 .buttonUnstyled {
 	background-color: var(--bg2);
 	border: none;
+	position: relative;
 }
 :is(button, .button).isFull {
 	width: 100%;
@@ -249,6 +250,18 @@ button:focus, .button:focus {
 .buttonOutline:not(:disabled):is(:active, :focus-visible) {
 	color: var(--accent);
 }
+
+.buttonUnstyled.isSorted::before {
+	content: '';
+	position: absolute;
+	right: 0.375em;
+	top: 0.375em;
+	width: 0.5em;
+	height: 0.5em;
+	border-radius: 50%;
+	background: var(--error);
+}
+
 @media (pointer: fine) {
 	:is(button, .button):not(:disabled, .buttonDark, .buttonOutline, .modal-button, .toast-x, .install-x, .scroller-arrow, .backBttn):is(:hover) {
 		border-color: var(--accent);
@@ -939,6 +952,12 @@ button:not(.basicIcon, .posterButton-info) :is(.fa-solid, .fa-regular, .fa-brand
 	margin: -.125rem -1.125rem -.125rem 0;
 }
 
+.downloadModal-link.isActive::after {
+	content: "\f00c";
+	font-family: "Font Awesome 6 Free";
+	font-weight: 900;
+}
+
 .searchCont {
 	padding: 1.25rem 1.5rem;
 }
@@ -1323,7 +1342,7 @@ button:not(.basicIcon, .posterButton-info) :is(.fa-solid, .fa-regular, .fa-brand
 		color: color-mix(in srgb, var(--text) 95%, transparent);
 	}
 }
-:is(.mobileNav-link, .desktopNav-link).isActive {
+:is(.mobileNav-link, .desktopNav-link, .downloadModal-link).isActive {
 	color: var(--accentLight);
 }
 .mobileNav-link:not(:last-child) {
