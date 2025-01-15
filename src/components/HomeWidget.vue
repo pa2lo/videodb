@@ -3,7 +3,7 @@ import { ref, onMounted } from 'vue'
 
 import BButton from './BButton.vue'
 
-import { lang, downloadHistory, favs, seriesHistory, moviesHistory, widgetsCache, widgetsMap, currentItemInfo } from '@/store'
+import { lang, downloadHistory, favs, seriesHistory, moviesHistory, widgetsCache, widgetsMap, currentItemInfo, ignoreMouseEvents } from '@/store'
 
 const PLUGIN_URL = import.meta.env.VITE_PLUGIN_URL
 
@@ -113,15 +113,21 @@ function getLinkData(link, index) {
 		<h3 class="hpWidget-title">{{ widgetsMap[id]?.sectionTitle[lang] }}</h3>
 		<Transition appear name="layout" mode="out-in" @enter="onPostersEnter">
 			<div v-if="loading" class="hpWidget-loader"><i class="fa-solid fa-spinner fa-spin-pulse fa-4x"></i></div>
-			<div v-else-if="content" class="posters-contOuter">
-				<div class="posters-cont scroller isHorizontal isFocusable" :class="[grid ? 'postersGrid' : 'postersSlider' ,{isCurrent: currentItemInfo?.hoverId?.startsWith(id)}]" @itementer="scrollerItemEnter" ref="scrollerEl" @scroll="onScrollerScroll">
+			<div v-else-if="content" class="posters-contOuter" :class="grid ? 'posters-contOuter-grid' : 'posters-contOuter-slider'">
+				<div class="posters-cont" :class="[grid ? 'postersGrid' : 'postersSlider scroller isHorizontal isFocusable' ,{isCurrent: !grid && currentItemInfo?.hoverId?.startsWith(id)}]" @itementer="scrollerItemEnter" ref="scrollerEl" @scroll="onScrollerScroll">
 					<template v-for="(link, linkIndex) in content.menu">
 						<div
 							v-if="link.type != 'next'"
-							class="poster isFocusableLR"
-							:class="{isCurrentLR: currentItemInfo?.hoverId == `${id}-${link?.id}`}"
+							class="poster"
+							:class="[
+								grid ? 'isFocusable' : 'isFocusableLR',
+								{
+									isCurrentLR: !grid && currentItemInfo?.hoverId == `${id}-${link?.id}`,
+									isCurrent: grid && currentItemInfo?.hoverId == `${id}-${link?.id}`
+								}
+							]"
 							@click="$emit('showDownload', link)"
-							@pointerenter="$emit('setCurrentItemInfo', getLinkData(link, linkIndex))"
+							@pointerenter="!ignoreMouseEvents && $emit('setCurrentItemInfo', getLinkData(link, linkIndex))"
 							@itementer="$emit('setCurrentItemInfo', getLinkData(link, linkIndex), true)"
 						>
 							<div class="poster-imgCont">
@@ -141,8 +147,10 @@ function getLinkData(link, index) {
 						</div>
 					</template>
 				</div>
-				<BButton class="scroller-arrow scroller-arrow-left" dark icon="fa-solid fa-chevron-left" :class="{isInvisible: !hasLeftArrow}" @click="scrollerEl.scrollLeft -= scrollerEl.clientWidth * 0.8" />
-				<BButton class="scroller-arrow scroller-arrow-right" dark icon="fa-solid fa-chevron-right" :class="{isInvisible: !hasRightArrow}" @click="scrollerEl.scrollLeft += scrollerEl.clientWidth * 0.8" />
+				<template v-if="!grid">
+					<BButton class="scroller-arrow scroller-arrow-left" dark icon="fa-solid fa-chevron-left" :class="{isInvisible: !hasLeftArrow}" @click="scrollerEl.scrollLeft -= scrollerEl.clientWidth * 0.8" />
+					<BButton class="scroller-arrow scroller-arrow-right" dark icon="fa-solid fa-chevron-right" :class="{isInvisible: !hasRightArrow}" @click="scrollerEl.scrollLeft += scrollerEl.clientWidth * 0.8" />
+				</template>
 			</div>
 		</Transition>
 	</div>

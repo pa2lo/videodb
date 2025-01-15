@@ -12,7 +12,7 @@ import HelpModalContent from './components/HelpModalContent.vue'
 import AppSettings from './components/AppSettings.vue'
 import DownloadLink from './components/DownloadLink.vue'
 
-import { lang, listsort, dubOnly, token, tokenDate, uid, downloadHistory, favs, generatorShows, generatorQuality, generatorShowsHistory, bookmarks, seriesHistory, moviesHistory, theme, hpWidgets, winPlayer, widgetsMap, currentPage, currentItemInfo, widgetsCache, toasts, showToast, destroyToast, showsMap, searchIdMap, genresMap, homepageLinks, moviesAdditionalLinks } from './store'
+import { lang, listsort, dubOnly, token, tokenDate, uid, downloadHistory, favs, generatorShows, generatorQuality, generatorShowsHistory, bookmarks, seriesHistory, moviesHistory, theme, hpWidgets, winPlayer, widgetsMap, currentPage, currentItemInfo, widgetsCache, toasts, showToast, destroyToast, showsMap, searchIdMap, genresMap, homepageLinks, moviesAdditionalLinks, ignoreMouseEvents } from './store'
 
 const queryParam = computed(() => {
 	return `${dubOnly.value == 'yes' ? 'dub=1&' : ''}lang=${lang.value}&uid=${uid.value}&ver=2.0`
@@ -63,8 +63,6 @@ const searchData = shallowReactive({
 	type: null,
 	model: '',
 	error: '',
-	optionsShow: false,
-	optionsCurrent: -1,
 	genreSearchShow: false,
 	genreType: 'FMovies',
 	genre: 1,
@@ -95,6 +93,7 @@ const trailerData = shallowReactive({
 // element refs
 const searchInputEl = ref(null)
 const mainEl = ref(null)
+const videoEl = ref(null)
 
 // modals
 const showSettingsModal = ref(false)
@@ -318,8 +317,8 @@ function setHistoryContent(index) {
 	if (showInfoModal.value) showInfoModal.value = false
 	if (downloadStreams.show) downloadStreams.show = false
 	if (showCurrentSortModal.value) showCurrentSortModal.value = false
+	if (searchData.genreSearchShow) searchData.genreSearchShow = false
 	if (searchData.show) searchData.show = false
-	if (searchData.optionsShow) searchData.optionsShow = false
 	if (trailerData.show) trailerData.show = false
 	if (csfdFrame.show) csfdFrame.show = false
 
@@ -400,7 +399,7 @@ async function refreshPage() {
 	}
 }
 async function visitLink(link, url) {
-	if (link?.action == 'csearch') return showSearch(link.id)
+	if (link?.action == 'csearch') return showSearch(true, link.id)
 	if (link?.action == 'generator') return showGeneratorPage()
 
 	if (link?.url && currentItemInfo.value?.url != link.url) setCurrentItemInfo(link)
@@ -570,25 +569,26 @@ function unshiftHistoryItem(historyType, item) {
 }
 
 // search
-function showSearch(id) {
-	if (id == 'by-genre') return searchData.genreSearchShow = true
-
+function showSearch(clear = false, type = null) {
+	if (clear === true) searchData.model = ''
+	searchData.type = type
 	searchData.error = ''
-	searchData.model = ''
 	searchData.show = true
-	searchData.type = id
 }
-function showSearchOptions() {
-	searchData.optionsCurrent = -1
-	searchData.optionsShow = true
+function searchPerson(name, isShow) {
+	let type = isShow ? 'search-people-series' : 'search-people-movie'
+
+	let newUrl = getSearchUrl(type, name)
+
+	doSearch(reduceStringByLangs('Search', null, (l) => `${searchIdMap[type][l]} - ${name}`), newUrl)
 }
-function doSearchGeneral() {
+function generalSearch(type) {
+	if (type == 'by-genre') return searchData.genreSearchShow = true
 	if (!searchData.model) return
-	searchData.show = false
 
-	let newUrl = `${PLUGIN_URL}/Search/${searchData.type}?id=${searchData.type}&ms=1&search=${encodeURI(searchData.model)}&${queryParam.value}`
+	let newUrl =  getSearchUrl(type, searchData.model)
 
-	doSearch(reduceStringByLangs('Search', null, (l) => `${searchIdMap[searchData.type][l]} - ${searchData.model}`), newUrl)
+	doSearch(reduceStringByLangs('Search', null, (l) => `${searchIdMap[type][l]} - ${searchData.model}`), newUrl)
 }
 function doSearchByGenre() {
 	searchData.genreSearchShow = false
@@ -600,18 +600,12 @@ function doSearchByGenre() {
 function doSearch(title, newUrl) {
 	const callback = () => visitLink({title}, newUrl)
 
-	if (searchData.optionsShow) {
-		searchData.optionsShow = false
+	if (searchData.show) {
+		searchData.show = false
 		return visitLinkFromHome({title}, newUrl)
 	}
 
 	callback()
-}
-function searchPerson(name) {
-	let newUrl = `${PLUGIN_URL}/Search/search-people?id=search-people&ms=1&search=${encodeURI(name)}&${queryParam.value}`
-	visitLink({
-		title: reduceStringByLangs('Search', name)
-	}, newUrl)
 }
 
 // Generator
@@ -785,6 +779,9 @@ function showMovieDBSite(site, id) {
 function showTrailer(url) {
 	trailerData.src = url
 	trailerData.show = true
+}
+function destroyTrailer() {
+	videoEl.value.src = ""
 }
 
 // login logout
@@ -1023,6 +1020,9 @@ function getLinkData(link, url) {
 		url: url ? url : link?.url || null
 	}
 }
+function getSearchUrl(type, value) {
+	return `${PLUGIN_URL}/Search/${type}?id=${type}&ms=1&search=${encodeURI(value)}&${queryParam.value}`
+}
 
 // main key events
 function onInfoKeydown(e) {
@@ -1070,10 +1070,9 @@ function onDownloadModalKeydown(e) {
 		else if (e.code == 'KeyC' && !e.metaKey && !e.ctrlKey) copyFileLink(downloadStreams.current)
 	}
 }
-function onSearchOptionsKeydown(e) {
-	if (e.code == 'ArrowDown') return searchData.optionsCurrent = (searchData.optionsCurrent + 1) % Object.keys(searchIdMap).length
-	else if (e.code == 'ArrowUp') return searchData.optionsCurrent = (Math.max(searchData.optionsCurrent, 0) - 1 + Object.keys(searchIdMap).length) % Object.keys(searchIdMap).length
-	else if (e.key == 'Enter' && searchData.optionsCurrent > -1) showSearch(Object.keys(searchIdMap)[searchData.optionsCurrent])
+function startIgnoringEvents(e) {
+	if (e.key == 'Shift') return
+	ignoreMouseEvents.value = true
 }
 
 // theme
@@ -1095,7 +1094,7 @@ function afterImport() {
 
 <template>
 	<Transition appear name="layout" mode="out-in" @afterEnter="onInterfaceEnter">
-		<div v-if="token" class="layout">
+		<div v-if="token" class="layout" @keydown="startIgnoringEvents" @mousemove="ignoreMouseEvents && (ignoreMouseEvents = false)">
 			<header class="flex ai-c header" :tabindex="isIOS ? '-1' : null">
 				<a class="logo" href="/" @click.prevent="currentHistoryIndex > 0 ? windowHistory.go(-currentHistoryIndex) : getHomePage(true)">
 					<svg viewBox="0 0 36 36" xmlns="http://www.w3.org/2000/svg" version="1.1" fill="#2ebc4f"><path d="M 0 18 C 0 0, 0 0, 18 0 S 36 0, 36 18, 36 36 18 36, 0 36, 0 18" transform="rotate(0, 18, 18) translate(0, 0)"></path></svg>
@@ -1145,7 +1144,7 @@ function afterImport() {
 						<BButton dark smaller class="buttonUnstyled" :class="{isSorted: currentPage?.sortBy}" icon="fa-solid fa-arrow-down-short-wide" :disabled="!['movies', 'tvshows'].includes(currentPage?.data?.system?.setContent)" @click.prevent="showCurrentSortModal = true" :title="t('List sort')" />
 						<BButton dark smaller class="buttonUnstyled" :icon="isInBookmarks ? 'fa-solid fa-bookmark' : 'fa-regular fa-bookmark'" :disabled="!currentPage?.url" @click.prevent="toggleBookmark" :title="isInBookmarks ? t('Remove from bookmarks') : t('Add to bookmarks')" />
 						<BButton dark smaller class="buttonUnstyled" icon="fa-solid fa-arrows-rotate" @click.prevent="refreshPage" :title="t('Refresh page')" />
-						<BButton dark smaller class="buttonUnstyled" icon="fa-solid fa-search" :title="t('Search')" @click="showSearchOptions" />
+						<BButton dark smaller class="buttonUnstyled" icon="fa-solid fa-search" :title="t('Search')" @click="showSearch" />
 						<BButton v-if="installPrompt || iOsInstallPrompt" class="buttonUnstyled" dark smaller icon="fa-solid fa-cloud-arrow-down" :title="t('Download App')" @click.prevent="installApp" />
 						<BButton dark smaller class="buttonUnstyled" icon="fa-solid fa-gear" :title="t('Settings')" @click.prevent="showSettingsModal = true" />
 						<BButton dark smaller class="buttonUnstyled" icon="fa-solid fa-question" :title="t('Help')" @click.prevent="showHelpModal = true" />
@@ -1160,18 +1159,18 @@ function afterImport() {
 					</div>
 					<div v-else-if="currentPage?.data?.system?.setContent == 'files'" class="dirPage scroller" :key="currentPage.id">
 						<div class="dirLinks">
-							<div v-if="currentPage?.type != 'home'" class="dirLink isFocusable" :class="{isCurrent: currentItemInfo && currentItemInfo.type == 'back'}" @click.prevent="windowHistory.go(-1)" @pointerenter="setCurrentItemInfo({type: 'back'})" @itementer="setCurrentItemInfo({type: 'back'}, true)">
+							<div v-if="currentPage?.type != 'home'" class="dirLink isFocusable" :class="{isCurrent: currentItemInfo && currentItemInfo.type == 'back'}" @click.prevent="windowHistory.go(-1)" @pointerenter="!ignoreMouseEvents && setCurrentItemInfo({type: 'back'})" @itementer="setCurrentItemInfo({type: 'back'}, true)">
 								<div class="dirLink-title"><i class="fa-solid fa-angle-left fa-fw"></i> {{ t('Back') }}</div>
 							</div>
 							<template v-for="link in currentPage?.data.menu">
-								<div v-if="(link.type == 'dir' || link?.action == 'csearch' || link?.action == 'generator') && link?.url != 'failed'" class="dirLink isFocusable" :class="{isCurrent: currentItemInfo && ((currentItemInfo.url && currentItemInfo.url == link.url) || (currentItemInfo.id && currentItemInfo.id == link.id))}" @click.prevent="visitLink(link)" @pointerenter="setCurrentItemInfo(link)" @itementer="setCurrentItemInfo(link, true)">
+								<div v-if="(link.type == 'dir' || link?.action == 'csearch' || link?.action == 'generator') && link?.url != 'failed'" class="dirLink isFocusable" :class="{isCurrent: currentItemInfo && ((currentItemInfo.url && currentItemInfo.url == link.url) || (currentItemInfo.id && currentItemInfo.id == link.id))}" @click.prevent="visitLink(link)" @pointerenter="!ignoreMouseEvents && setCurrentItemInfo(link)" @itementer="setCurrentItemInfo(link, true)">
 									<div class="dirLink-title" v-html="link.i18n_info ? reformatString(link.i18n_info[lang]?.title) : reformatString(link.title)"></div>
 								</div>
 							</template>
 						</div>
 						<div v-if="currentPage?.type == 'home' && bookmarks.length" class="generatorSection dirLinks divided">
 							<template v-for="link in bookmarks">
-								<div class="dirLink isFocusable" :class="{isCurrent: currentItemInfo && ((currentItemInfo.url && currentItemInfo.url == link.url) || (currentItemInfo.id && currentItemInfo.id == link.id))}" @click.prevent="visitLink(link)" @pointerenter="setCurrentItemInfo(link)" @itementer="setCurrentItemInfo(link, true)">
+								<div class="dirLink isFocusable" :class="{isCurrent: currentItemInfo && ((currentItemInfo.url && currentItemInfo.url == link.url) || (currentItemInfo.id && currentItemInfo.id == link.id))}" @click.prevent="visitLink(link)" @pointerenter="!ignoreMouseEvents && setCurrentItemInfo(link)" @itementer="setCurrentItemInfo(link, true)">
 									<div class="dirLink-title" v-html="reformatString(link.title[lang])"></div>
 								</div>
 							</template>
@@ -1234,6 +1233,27 @@ function afterImport() {
 						</div>
 					</div>
 					<div v-else-if="['movies', 'tvshows', 'episodes', 'seasons'].includes(currentPage?.data?.system?.setContent)" class="moviesPage" :key="`i-${currentPage.ts}`">
+						<div class="movieLinks scroller">
+							<div v-if="customHistory.length" class="movieLink isFocusable movieLink-back" :class="{isCurrent: currentItemInfo && currentItemInfo.type == 'back'}" @click.prevent="windowHistory.go(-1)" @pointerenter="!ignoreMouseEvents && setCurrentItemInfo({type: 'back'})" @itementer="setCurrentItemInfo({type: 'back'}, true)">
+								<div class="movieLink-title"><i class="fa-solid fa-angle-left fa-fw"></i> {{ t('Back') }}</div>
+							</div>
+							<template v-for="link in sortedList">
+								<div v-if="!link.action" class="movieLink isFocusable flex ai-c" :class="{isCurrent: currentItemInfo && currentItemInfo.url == link.url}" @click="showDownload(link)" @pointerenter="!ignoreMouseEvents && setCurrentItemInfo(link)" @itementer="setCurrentItemInfo(link, true)">
+									<span class="movieLink-title" v-html="reformatString(link.i18n_info[lang].title)"></span>
+									<i v-if="link?.type == 'video' && link?.url && downloadHistory.includes(link.url)" class="fa-regular fa-eye"></i>
+									<i v-else-if="currentPage?.data?.system?.setContent == 'seasons' && link?.url && downloadHistory.some(hitem => hitem.includes(`/Play/${link?.id}/${link?.info?.season}/`))" class="fa-regular fa-eye"></i>
+									<i v-else-if="currentPage?.data?.system?.setContent != 'seasons' && link?.type == 'dir' && link.url && downloadHistory.some(hitem => hitem.includes(`/Play/${link?.id}/`))" class="fa-regular fa-eye"></i>
+									<i v-if="link.id && ['movies', 'tvshows'].includes(currentPage?.data?.system?.setContent) && favs.some(fav => fav.id == link.id)" class="fa-solid fa-heart"></i>
+									<span v-if="link?.info?.rating" class="movieLink-rating" :class="{isAverage: link?.info?.rating < 7.5 && link?.info?.rating > 4, isBad: link?.info?.rating <= 4}"></span>
+									<div class="movieLink-mobileLi movieLink-mobileLi-mobile" v-if="link.type != 'next'" @click.stop="showCurrentItemInfo">
+										<i class="fa-solid fa-info"></i>
+									</div>
+									<div class="movieLink-mobileLi movieLink-mobileLi-tabled" v-if="link.type != 'next'" @click.stop="false">
+										<i class="fa-solid fa-info"></i>
+									</div>
+								</div>
+							</template>
+						</div>
 						<div class="movieInfo">
 							<Transition name="layout" mode="out-in">
 								<MediaInfo
@@ -1252,27 +1272,6 @@ function afterImport() {
 									@showTrailer="showTrailer"
 								 />
 							</Transition>
-						</div>
-						<div class="movieLinks scroller">
-							<div v-if="customHistory.length" class="movieLink isFocusable movieLink-back" :class="{isCurrent: currentItemInfo && currentItemInfo.type == 'back'}" @click.prevent="windowHistory.go(-1)" @pointerenter="setCurrentItemInfo({type: 'back'})" @itementer="setCurrentItemInfo({type: 'back'}, true)">
-								<div class="movieLink-title"><i class="fa-solid fa-angle-left fa-fw"></i> {{ t('Back') }}</div>
-							</div>
-							<template v-for="link in sortedList">
-								<div v-if="!link.action" class="movieLink isFocusable flex ai-c" :class="{isCurrent: currentItemInfo && currentItemInfo.url == link.url}" @click="showDownload(link)" @pointerenter="setCurrentItemInfo(link)" @itementer="setCurrentItemInfo(link, true)">
-									<span class="movieLink-title" v-html="reformatString(link.i18n_info[lang].title)"></span>
-									<i v-if="link?.type == 'video' && link?.url && downloadHistory.includes(link.url)" class="fa-regular fa-eye"></i>
-									<i v-else-if="currentPage?.data?.system?.setContent == 'seasons' && link?.url && downloadHistory.some(hitem => hitem.includes(`/Play/${link?.id}/${link?.info?.season}/`))" class="fa-regular fa-eye"></i>
-									<i v-else-if="currentPage?.data?.system?.setContent != 'seasons' && link?.type == 'dir' && link.url && downloadHistory.some(hitem => hitem.includes(`/Play/${link?.id}/`))" class="fa-regular fa-eye"></i>
-									<i v-if="link.id && ['movies', 'tvshows'].includes(currentPage?.data?.system?.setContent) && favs.some(fav => fav.id == link.id)" class="fa-solid fa-heart"></i>
-									<span v-if="link?.info?.rating" class="movieLink-rating" :class="{isAverage: link?.info?.rating < 7.5 && link?.info?.rating > 4, isBad: link?.info?.rating <= 4}"></span>
-									<div class="movieLink-mobileLi movieLink-mobileLi-mobile" v-if="link.type != 'next'" @click.stop="showCurrentItemInfo">
-										<i class="fa-solid fa-info"></i>
-									</div>
-									<div class="movieLink-mobileLi movieLink-mobileLi-tabled" v-if="link.type != 'next'" @click.stop="false">
-										<i class="fa-solid fa-info"></i>
-									</div>
-								</div>
-							</template>
 						</div>
 					</div>
 					<div v-else-if="currentPage?.type == 'geneartor'" class="dirPage scroller">
@@ -1330,7 +1329,7 @@ function afterImport() {
 					<i class="fa-solid fa-shuffle mobileNav-icon"></i>
 					<div class="mobileNav-title">{{ t('Random') }}</div>
 				</div>
-				<div class="mobileNav-link" @click.prevent="showSearchOptions">
+				<div class="mobileNav-link" @click.prevent="showSearch">
 					<i class="fa-solid fa-magnifying-glass mobileNav-icon"></i>
 					<div class="mobileNav-title">{{ t('Search') }}</div>
 				</div>
@@ -1348,10 +1347,28 @@ function afterImport() {
 					</div>
 				</div>
 			</Transition>
-			<BModal v-model:open="searchData.optionsShow" narrow :title="t('Search')" @keydown="onSearchOptionsKeydown">
-				<div v-for="(option, key, index) in searchIdMap" class="downloadModal-link flex ai-c" :class="{isCurrent: searchData.optionsCurrent == index}" @pointerenter="searchData.optionsCurrent = index" @click="showSearch(key)">
-					<div class="downloadModal-linkTitle flex ai-c"><span class="searchOption">{{ option[lang] }}</span></div>
-				</div>
+			<BModal v-model:open="searchData.show" narrow :title="searchData.type ? `${t('Search')} ${searchIdMap[searchData.type]?.[lang]}` : t('Search')">
+				<form class="searchCont">
+					<label class="blockLabel line">
+						<input ref="searchInputEl" class="input autofocus isFull" :placeholder="t('Search text...')" v-model="searchData.model" required />
+					</label>
+					<div class="line">
+						<template v-for="(option, key) in searchIdMap">
+							<BButton
+								v-if="!searchData.type || searchData.type == key"
+								:icon="key != 'by-genre' ? 'fa-solid fa-magnifying-glass' : null"
+								:dark="key == 'by-genre'"
+								class="smallerLine"
+								full
+								:type="key == 'search-movie' || searchData?.type == key ? 'submit' : 'button'"
+								@click.prevent="generalSearch(key)"
+								:disabled="key != 'by-genre' && !searchData.model"
+							>
+								<span class="searchOption">{{ searchData.type ? t('Search') : option[lang] }}</span>
+							</BButton>
+						</template>
+					</div>
+				</form>
 			</BModal>
 			<BModal v-model:open="showInfoModal" wider :title="t('Video information')" @keydown="onInfoKeydown" @swipeX="findNextMedia">
 				<div class="modal-movieInfo-arrows">
@@ -1385,7 +1402,7 @@ function afterImport() {
 				</Transition>
 				<div v-if="downloadStreams.loading" class="modal-loader"><i class="fa-solid fa-spinner fa-spin-pulse fa-3x"></i></div>
 				<div v-else>
-					<DownloadLink v-for="streamLink in downloadStreams.data.strms" :loading="downloadStreams.loadingLink == streamLink.url" class="isFocusable" :link="streamLink" :isSupportedOs :isDesktopOs :current="downloadStreams.current?.url == streamLink.url" @downloadFile="downloadFile" @copyFileLink="copyFileLink" @pointerenter="downloadStreams.current = streamLink">
+					<DownloadLink v-for="streamLink in downloadStreams.data.strms" :loading="downloadStreams.loadingLink == streamLink.url" class="isFocusable" :link="streamLink" :isSupportedOs :isDesktopOs :current="downloadStreams.current?.url == streamLink.url" @downloadFile="downloadFile" @copyFileLink="copyFileLink" @pointerenter="!ignoreMouseEvents && (downloadStreams.current = streamLink)">
 						<strong>{{ streamLink.size }}</strong> - {{ streamLink.quality }} <span class="light"><span class="downloadModal-streamInfoPC">{{ streamLink.vinfo }}{{ streamLink.ainfo }}</span><span class="downloadModal-streamInfoMobile">{{ streamLink.linfo?.join(', ').toUpperCase() }}</span></span>
 					</DownloadLink>
 					<div class="downloadModal-episodeInfo flex ai-c">
@@ -1482,16 +1499,6 @@ function afterImport() {
 					</div>
 				</form>
 			</BModal>
-			<BModal v-model:open="searchData.show" :title="`${t('Search')} ${searchIdMap[searchData.type]?.[lang]}`" @afterEnter="searchInputEl.focus()">
-				<form class="searchCont" @submit.prevent="doSearchGeneral">
-					<label class="blockLabel line">
-						<input ref="searchInputEl" class="input isFull" :placeholder="t('Search text...')" v-model="searchData.model" required/>
-					</label>
-					<div class="line t-right">
-						<BButton icon="fa-solid fa-magnifying-glass" type="submit" :disabled="!searchData.model">Hľadať</BButton>
-					</div>
-				</form>
-			</BModal>
 			<BModal v-model:open="showSettingsModal" narrow :title="t('Settings')">
 				<AppSettings :isWindows @afterImport="afterImport" />
 			</BModal>
@@ -1517,8 +1524,8 @@ function afterImport() {
 			<BModal v-model:open="csfdFrame.show" wider title="CSFD" class="movieDB-modal">
 				<iframe :src="csfdFrame.src" referrerpolicy="no-referrer"></iframe>
 			</BModal>
-			<BModal v-model:open="trailerData.show" wider class="trailer-modal">
-				<video class="trailer" :src="trailerData.src" controls autoplay playsinline></video>
+			<BModal v-model:open="trailerData.show" wider class="trailer-modal" @beforeClose="destroyTrailer">
+				<video ref="videoEl" class="trailer" :src="trailerData.src" controls autoplay playsinline></video>
 			</BModal>
 		</div>
 		<div v-else class="loginScreen">

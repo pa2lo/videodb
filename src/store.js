@@ -24,6 +24,8 @@ export const currentItemInfo = ref(null)
 export const widgetsCache = ref({})
 export const toasts = ref([])
 
+export const ignoreMouseEvents = ref(false)
+
 // maps
 export const widgetsMap = {
 	'wm-01': {
@@ -119,30 +121,30 @@ export const showsMap = {
 	'14362': 'Rick and Morty'
 }
 export const searchIdMap = {
-	'by-genre': {
-		sk: 'podľa žánru',
-		cs: 'podle žánru',
-		en: 'by genre'
-	},
 	'search-movie': {
 		sk: 'film podľa názvu',
 		cs: 'film podle názvu',
 		en: 'movie by title',
-	},
-	'search-people-movie': {
-		sk: 'film podľa herca',
-		cs: 'film podle herce',
-		en: 'movie by actor'
 	},
 	'search-series': {
 		sk: 'seriál podľa názvu',
 		cs: 'seriál podle názvu',
 		en: 'series by title'
 	},
+	'search-people-movie': {
+		sk: 'film podľa herca',
+		cs: 'film podle herce',
+		en: 'movie by actor'
+	},
 	'search-people-series': {
 		sk: 'seriál podľa herca',
 		cs: 'seriál podle herce',
 		en: 'series by actor'
+	},
+	'by-genre': {
+		sk: 'podľa žánru',
+		cs: 'podle žánru',
+		en: 'by genre'
 	}
 }
 export const genresMap = {

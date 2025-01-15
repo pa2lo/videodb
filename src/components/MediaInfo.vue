@@ -90,7 +90,7 @@ onBeforeUnmount(() => {
 				<span class="light">{{ t('Director') }}: </span>
 				<template v-for="(director, index) in currentItemInfo.info?.director">
 					<template v-if="index < 4">
-						<span class="asLink" @click="$emit('searchPerson', director)">{{ director }}</span>
+						<span class="asLink" @click="$emit('searchPerson', director, currentItemInfo.info?.mediatype == 'tvshow')">{{ director }}</span>
 						<template v-if="index+1 < currentItemInfo.info.director.length">
 							<template v-if="index < 3">, </template>
 							<template v-else>...</template>
@@ -102,7 +102,7 @@ onBeforeUnmount(() => {
 				<span class="light">{{ t('Stars') }}: </span>
 				<template v-for="(star, index) in currentItemInfo.cast">
 					<template v-if="index < 6">
-						<span class="asLink" :title="star.role" @click="$emit('searchPerson', star.name)">{{ star.name }}</span>
+						<span class="asLink" :title="star.role" @click="$emit('searchPerson', star.name, currentItemInfo.info?.mediatype == 'tvshow')">{{ star.name }}</span>
 						<template v-if="index+1 < currentItemInfo.cast.length">
 							<template v-if="index < 5">, </template>
 							<template v-else>...</template>
@@ -117,7 +117,7 @@ onBeforeUnmount(() => {
 			<div v-if="currentItemInfo.unique_ids.csfd || currentItemInfo.unique_ids.imdb || currentItemInfo.info.trailer" class="movieInfo-buttonsInner">
 				<BButton v-if="currentItemInfo.unique_ids.csfd" dark @click.prevent="$emit('showMovieDBSite', 'csfd', currentItemInfo.unique_ids.csfd)">CSFD</BButton>
 				<BButton v-if="currentItemInfo.unique_ids.imdb" dark @click.prevent="$emit('showMovieDBSite', 'imdb', currentItemInfo.unique_ids.imdb)">IMDB</BButton>
-				<BButton v-if="currentItemInfo.info.trailer" dark icon="fa-brands fa-youtube" @click.prevent="$emit('showTrailer', currentItemInfo.info.trailer)">Trailer</BButton>
+				<BButton v-if="currentItemInfo.info.trailer" dark @click.prevent="$emit('showTrailer', currentItemInfo.info.trailer)">Trailer</BButton>
 			</div>
 		</div>
 	</div>

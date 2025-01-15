@@ -14,12 +14,13 @@ const props = defineProps({
 	narrow: Boolean
 })
 
-const emit = defineEmits(['afterEnter', 'swipeX'])
+const emit = defineEmits(['afterEnter', 'swipeX', 'beforeClose'])
 
 let lastFocusedEl = null
 function afterModalEnter(e) {
 	lastFocusedEl = document.activeElement.closest('.posterButton-info') ? document.querySelector('.main') : document.activeElement
-	if (e?.classList?.contains('modal')) e.focus()
+	if (e.querySelector('.autofocus')) e.querySelector('.autofocus').focus()
+	else if (e?.classList?.contains('modal')) e.focus()
 	emit('afterEnter')
 }
 function afterModalLeave(e) {
@@ -28,6 +29,11 @@ function afterModalLeave(e) {
 }
 function onDeleteKey() {
 	if (document.activeElement && document.activeElement.matches('input')) return
+	closeModal()
+}
+
+function closeModal() {
+	emit('beforeClose')
 	open.value = false
 }
 
@@ -97,7 +103,7 @@ function onTouchMove(e) {
 }
 function onTouchEnd() {
 	if (moveActive.value) {
-		if (offY.value > 100) open.value = false
+		if (offY.value > 100) closeModal()
 		else if (Math.abs(offX.value) > 80) emit('swipeX', offX.value < 0)
 	}
 	requestAnimationFrame(() => {
@@ -130,8 +136,8 @@ onBeforeUnmount(() => {
 			v-if="open"
 			class="modal"
 			:class="{isMovingDown: moveActive && isMovingDown}"
-			@click.self="open = false"
-			@keydown.esc="open = false"
+			@click.self="closeModal"
+			@keydown.esc="closeModal"
 			@keydown.delete="onDeleteKey"
 			tabindex="-1"
 			v-bind="$attrs"
@@ -141,7 +147,7 @@ onBeforeUnmount(() => {
 			<div class="modal-cont" :class="{isWider: wider, isNarrow: narrow, moveActive: moveActive}" :style="computedStype" @touchstart="onTouchStart">
 				<div class="modal-buttons">
 					<slot name="buttons"></slot>
-					<BButton class="modal-button" @click="open = false">✕</BButton>
+					<BButton class="modal-button" @click="closeModal">✕</BButton>
 				</div>
 				<h3 v-if="title" class="modal-title">{{ title }}</h3>
 				<slot />
