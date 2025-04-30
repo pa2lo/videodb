@@ -1,5 +1,7 @@
 <script setup>
 import { t } from '@/labels'
+
+const buildTime = __BUILD_TIMESTAMP__;
 </script>
 
 <template>
@@ -144,5 +146,7 @@ import { t } from '@/labels'
 				- {{ t('Add to playlist') }}
 			</div>
 		</div>
+		<div class="settingsDivider line"></div>
+		<div class="line">Build: {{ buildTime }}</div>
 	</div>
 </template>

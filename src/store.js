@@ -5,6 +5,7 @@ export const lang = useStorage('lang', 'sk')
 export const listsort = useStorage('listsort', '')
 export const dubOnly = useStorage('dubOnly', 'yes')
 export const token = useStorage('token', null)
+export const downloadToken = useStorage('downloadToken', null)
 export const tokenDate = useStorage('tokenDate', null)
 export const uid = useStorage('uid', `9802BF2F-C445-552D-A3EE-${Date.now()}`, true)
 export const downloadHistory = useStorage('downloadHistory', [])
@@ -34,7 +35,7 @@ export const widgetsMap = {
 			cs: 'Filmy - novinky',
 			en: 'Movies - new'
 		},
-		fetchUrl: '/FMovies/latest?limit=30&page=1',
+		fetchUrl: '/FMovies/latest',
 		url: '/FMovies/latest'
 	},
 	'wm-02': {
@@ -43,7 +44,7 @@ export const widgetsMap = {
 			cs: 'Filmy - nejnovější streamy',
 			en: 'Movies - new streams'
 		},
-		fetchUrl: '/FMovies/newstream?limit=30&page=1',
+		fetchUrl: '/FMovies/newstream',
 		url: '/FMovies/newstream'
 	},
 	'wm-03': {
@@ -61,7 +62,7 @@ export const widgetsMap = {
 			cs: 'Filmy - náhodné',
 			en: 'Movies - random'
 		},
-		fetchUrl: '/Filter/?typ=1&pg=0&r=>60&y=>2010&of=random&od=desc&limit=30&page=1',
+		fetchUrl: '/Filter/?limit=30&od=desc&of=random&r=>60&typ=1&y=>2010',
 		url: '/Filter/?typ=1&pg=0&r=>60&y=>2010&of=random&od=desc&limit=20&page=1'
 	},
 	'ws-01': {
@@ -70,7 +71,7 @@ export const widgetsMap = {
 			cs: 'Seriály - novinky',
 			en: 'TV Shows - new'
 		},
-		fetchUrl: '/FSeries/latestt?limit=30&page=1',
+		fetchUrl: '/FSeries/latestt',
 		url: '/FSeries/latestt'
 	},
 	'ws-02': {
@@ -79,7 +80,7 @@ export const widgetsMap = {
 			cs: 'Seriály - nejnovější přidané',
 			en: 'TV Shows - latest shows'
 		},
-		fetchUrl: '/FSeries/latest?limit=30&page=1',
+		fetchUrl: '/FSeries/latest',
 		url: '/FSeries/latest'
 	},
 	'wm-last': {

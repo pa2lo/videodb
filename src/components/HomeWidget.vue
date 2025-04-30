@@ -4,6 +4,7 @@ import { ref, onMounted } from 'vue'
 import BButton from './BButton.vue'
 
 import { lang, downloadHistory, favs, seriesHistory, moviesHistory, widgetsCache, widgetsMap, currentItemInfo, ignoreMouseEvents } from '@/store'
+import { getProxyData } from '@/helpers'
 
 const PLUGIN_URL = import.meta.env.VITE_PLUGIN_URL
 
@@ -44,10 +45,11 @@ onMounted(async () => {
 	} else {
 		loading.value = true
 
-		const response = await fetch(`${PLUGIN_URL}${widgetsMap[props.id]?.fetchUrl}&${props.queryParam}`)
-		const page = await response.json()
+		const wMapItem = widgetsMap[props.id]
+		const url = `${PLUGIN_URL}${wMapItem.fetchUrl}${wMapItem.fetchUrl.includes('?') ? '&' : '?'}${props.queryParam}`
+		const page = await getProxyData(url)
 
-		let l = page.menu?.length || 1
+		page.menu.length = 30
 
 		page.menu?.map((item, index, arr) => {
 			if (item.info?.rating && item.info.rating > 0 && item.info.rating < 1) item.info.rating = parseFloat((item.info.rating * 10).toFixed(2))

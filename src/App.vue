@@ -12,7 +12,8 @@ import HelpModalContent from './components/HelpModalContent.vue'
 import AppSettings from './components/AppSettings.vue'
 import DownloadLink from './components/DownloadLink.vue'
 
-import { lang, listsort, dubOnly, token, tokenDate, uid, downloadHistory, favs, generatorShows, generatorQuality, generatorShowsHistory, bookmarks, seriesHistory, moviesHistory, theme, hpWidgets, winPlayer, widgetsMap, currentPage, currentItemInfo, widgetsCache, toasts, showToast, destroyToast, showsMap, searchIdMap, genresMap, homepageLinks, moviesAdditionalLinks, ignoreMouseEvents } from './store'
+import { lang, listsort, dubOnly, token, downloadToken, tokenDate, uid, downloadHistory, favs, generatorShows, generatorQuality, generatorShowsHistory, bookmarks, seriesHistory, moviesHistory, theme, hpWidgets, winPlayer, widgetsMap, currentPage, currentItemInfo, widgetsCache, toasts, showToast, destroyToast, showsMap, searchIdMap, genresMap, homepageLinks, moviesAdditionalLinks, ignoreMouseEvents } from './store'
+import { getProxyData } from './helpers'
 
 const queryParam = computed(() => {
 	return `${dubOnly.value == 'yes' ? 'dub=1&' : ''}lang=${lang.value}&uid=${uid.value}&ver=2.0`
@@ -20,6 +21,7 @@ const queryParam = computed(() => {
 
 const PLUGIN_URL = import.meta.env.VITE_PLUGIN_URL
 const SERVICE_URL = import.meta.env.VITE_SERVICE_URL
+const DOWNLOAD_SERVICE_URL = import.meta.env.VITE_DOWNLOAD_SERVICE_URL
 
 // OS
 const isMac = navigator?.platform == 'MacIntel' && navigator.maxTouchPoints < 2
@@ -360,10 +362,9 @@ async function getHomePage(reload) {
 
 async function getUrlContent(url, customUrl) {
 	let destination = customUrl ? customUrl : url
-	if (!destination?.startsWith(PLUGIN_URL)) destination = url?.includes('&uid=') ? `${PLUGIN_URL}/${url}` : `${PLUGIN_URL}/${url}${url.includes('?') ? '&' : '?'}${queryParam.value}`
+	if (!destination?.startsWith(PLUGIN_URL)) destination = url?.includes('&uid=') ? `${PLUGIN_URL}${url}` : `${PLUGIN_URL}${url}${url.includes('?') ? '&' : '?'}${queryParam.value}`
 
-	const response = await fetch(destination, { signal: AbortSignal.timeout(10000) })
-	const page = await response.json()
+	const page = await getProxyData(destination)
 
 	if (!page?.menu?.length) {
 		appState.loading = false
@@ -465,8 +466,7 @@ async function showDownload(link) {
 	})
 
 	try {
-		const response = await fetch(`${PLUGIN_URL}/${link.url}?${queryParam.value}`)
-		const data = await response.json()
+		const data = await getProxyData(`${PLUGIN_URL}/${link.url}?${queryParam.value}`)
 
 		downloadStreams.data = data
 		downloadStreams.loading = false
@@ -631,12 +631,10 @@ async function getRandomShowsEpisode(ignoreHistory) {
 	let episode
 
 	try {
-		const seasonsFetch = await fetch(`${PLUGIN_URL}/FGet/${showId}?${queryParam.value}`)
-		const seasonsFetchData = await seasonsFetch.json()
+		const seasonsFetchData = await getProxyData(`${PLUGIN_URL}/FGet/${showId}?${queryParam.value}`)
 		const season = seasonsFetchData.menu[Math.floor(Math.random() * seasonsFetchData.menu.length)]
 
-		const episodesFetch = await fetch(`${PLUGIN_URL}/${season.url}?${queryParam.value}`)
-		const episodesFetchData = await episodesFetch.json()
+		const episodesFetchData = await getProxyData(`${PLUGIN_URL}/${season.url}?${queryParam.value}`)
 		episode = episodesFetchData.menu[Math.floor(Math.random() * episodesFetchData.menu.length)]
 	} catch (error) {
 		showToast(t('Error loading data'))
@@ -645,8 +643,7 @@ async function getRandomShowsEpisode(ignoreHistory) {
 	if (generatorShowsHistory.value.some(hitem => hitem.epUrl == episode.url)) return getRandomShowsEpisode(true)
 
 	try {
-		const streamsFetch = await fetch(`${PLUGIN_URL}/${episode.url}?${queryParam.value}`)
-		const streamsFetchData = await streamsFetch.json()
+		const streamsFetchData = await getProxyData(`${PLUGIN_URL}/${episode.url}?${queryParam.value}`)
 		streamsFetchData.strms.map(stream => {
 			stream.size = stream.size.includes('GB') ? parseFloat(stream.size)*1000 : parseFloat(stream.size)
 		})
@@ -791,12 +788,6 @@ onBeforeMount(() => {
 		appState.autoLogin = true
 	} else if (token.value) getHomePage()
 
-	if (!token.value && window.location.hash == '#demo') {
-		token.value = 'demoToken123456789'
-		tokenDate.value = 1600000000000
-		getHomePage()
-	}
-
 	window.addEventListener('beforeinstallprompt', (e) => {
 		e.preventDefault()
 		if (!installPromptCancelled.value) showInstallPrompt.value = true
@@ -809,6 +800,7 @@ onBeforeUnmount(() => {
 function logout() {
 	token.value = ''
 	tokenDate.value = ''
+	downloadToken.value = ''
 	customHistory.value.length = 1
 }
 async function getToken() {
@@ -825,20 +817,31 @@ async function getToken() {
 	fetch(`${SERVICE_URL}/user/login`, options)
 		.then(response => response.json())
 		.then(async response => {
-			appState.isLogging = false
 			if (response.session_id) {
 				if (appState.krRemember) saveTokenInfoB()
 				else if (localStorage.getItem('tokenInfoB')) localStorage.removeItem('tokenInfoB')
 
-				token.value = response.session_id
-				tokenDate.value = Date.now()
+				const newDownloadToken = await getDownloadToken(response.session_id)
 
-				getHomePage()
+				if (newDownloadToken == false) {
+					appState.isLogging = false
+					appState.loginError = 'Unable to get download token'
+				} else {
+					appState.isLogging = false
+					token.value = response.session_id
+					downloadToken.value = newDownloadToken
+					tokenDate.value = Date.now()
 
-				appState.krUser = ''
-				appState.krPass = ''
-				appState.krRemember = false
-			} else if (response.msg) appState.loginError = response.msg
+					getHomePage()
+
+					appState.krUser = ''
+					appState.krPass = ''
+					appState.krRemember = false
+				}
+			} else if (response.msg) {
+				appState.isLogging = false
+				appState.loginError = response.msg
+			}
 		})
 		.catch(err => console.error(err))
 }
@@ -854,6 +857,44 @@ function getLSTokenInfoB() {
 	if (!lsData) return
 
 	return JSON.parse(atob(lsData))
+}
+async function getDownloadToken(session_id) {
+	try {
+		const fileList = await fetch(`${SERVICE_URL}/file/list`, {
+			method: 'POST',
+			headers: {'Content-Type': 'application/json'},
+			body: `{"session_id": "${session_id}","data": {"parent": "","filter": "sc.json"}}`
+		})
+		const fileListJSON = await fileList.json()
+
+		if (!fileListJSON.data?.[0]?.ident) return false
+
+		console.log(`/file/list ident - ${fileListJSON.data[0].ident}`)
+
+		const fileDownload = await fetch(`${SERVICE_URL}/file/download`, {
+			method: 'POST',
+			headers: {'Content-Type': 'application/json'},
+			body: `{"session_id":"${session_id}","data":{"ident":"${fileListJSON.data[0].ident}"}}`
+		})
+		const fileDownloadJSON = await fileDownload.json()
+
+		if (!fileDownloadJSON?.data?.link) return false
+
+		console.log(`/file/list link - ${fileDownloadJSON.data.link}`)
+
+		const tokenData = await fetch(`${DOWNLOAD_SERVICE_URL}/getTokenContent.php`, {
+			method: 'POST',
+			body: new URLSearchParams({ url: fileDownloadJSON.data.link })
+		})
+		const tokenDataTEXT = await tokenData.text()
+
+		if (!tokenDataTEXT) return false
+
+		return tokenDataTEXT
+	} catch (error) {
+		console.log(error)
+		return false
+	}
 }
 
 async function onInterfaceEnter() {
@@ -904,8 +945,8 @@ async function getDownloadLink(url) {
 
 		downloadController = new AbortController()
 
-		const response = await fetch(`${PLUGIN_URL}/${url}?${queryParam.value}`, { signal: AbortSignal.any([downloadController.signal, AbortSignal.timeout(10000)]) });
-		const id = await response.json()
+		const id = await getProxyData(`${PLUGIN_URL}/${url}?${queryParam.value}`, downloadController.signal)
+
 		if (!id?.ident) {
 			downloadStreams.error = t('Error loading ID')
 			return false
@@ -917,8 +958,6 @@ async function getDownloadLink(url) {
 			body: `{"session_id":"${token.value}","data":{"ident":"${id.ident}"}}`,
 			signal: AbortSignal.any([downloadController.signal, AbortSignal.timeout(10000)])
 		}
-
-		if (token.value == 'demoToken123456789') return showToast('Not available with demo token!')
 
 		const response2 = await fetch(`${SERVICE_URL}/file/download`, options)
 		const res = await response2.json()
@@ -956,7 +995,7 @@ function getSystemLink(url, playLink, enqueue) {
 	if (!playLink) return url
 
 	if (isMac) return `iina://weblink?url=${encodeURI(url)}${enqueue ? '&enqueue=1' : ''}`
-	else if (isAndroid) return `vlc://${url}`
+	else if (isAndroid) return `vlc://${url.replace('https://', '')}`
 	else if (isIOS) return `vlc-x-callback://x-callback-url/stream?url=${url}`
 	else if (isWindows && winPlayer.value == 'pot') return `potplayer://${url}${enqueue ? ' /add' : ''}`
 	else if (isWindows && winPlayer.value == 'vlc') return `${enqueue ? 'vlcenqueue' : 'vlcplay'}://${url}`
@@ -1021,7 +1060,7 @@ function getLinkData(link, url) {
 	}
 }
 function getSearchUrl(type, value) {
-	return `${PLUGIN_URL}/Search/${type}?id=${type}&ms=1&search=${encodeURI(value)}&${queryParam.value}`
+	return `${PLUGIN_URL}/Search/${type}?gen=1&id=${type}&ms=1&search=${value.replace(' ', '+')}&${queryParam.value}`
 }
 
 // main key events
@@ -1558,6 +1597,7 @@ function afterImport() {
 		<TransitionGroup name="toasts">
 			<div v-for="toast in toasts" class="toast" :key="toast.id">
 				<i v-if="toast.icon == 'check'" class="toast-icon fa-regular fa-circle-check"></i>
+				<i v-else-if="toast.icon == 'x'" class="toast-icon fa-solid fa-circle-exclamation"></i>
 				<div class="toast-text">{{ toast.text }}</div>
 				<BButton class="toast-x" @click="destroyToast(toast.id)">✕</BButton>
 			</div>
