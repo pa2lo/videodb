@@ -35,6 +35,7 @@
 	--accentCompoement: #fff;
 
 	--error: #e5003e;
+	--success: #55c803;
 
 	--overlayMask: var(--light, #0007) var(--dark, #000);
 
@@ -113,6 +114,9 @@ h4 {
 
 * + :is(button, div, *).line {
 	margin-top: 1.125rem;
+}
+* + :is(button, div, *).baseLine {
+	margin-top: .875rem;
 }
 * + :is(button, div, *).smallerLine {
 	margin-top: 0.5rem;
@@ -200,6 +204,9 @@ img {
 	font-weight: 600;
 	color: var(--accentCompoement);
 }
+.modal-error {
+	padding-inline: 1.5rem;
+}
 
 /* buttons */
 .buttons {
@@ -255,7 +262,8 @@ button:focus, .button:focus {
 	color: var(--accent);
 }
 
-.buttonUnstyled.isSorted::before {
+.buttonUnstyled.isSorted::before,
+.buttonUnstyled.isError::before {
 	content: '';
 	position: absolute;
 	right: 0.375em;
@@ -263,6 +271,9 @@ button:focus, .button:focus {
 	width: 0.5em;
 	height: 0.5em;
 	border-radius: 50%;
+	background: var(--success);
+}
+.buttonUnstyled.isError::before {
 	background: var(--error);
 }
 
@@ -329,6 +340,11 @@ button:not(.basicIcon, .posterButton-info) :is(.fa-solid, .fa-regular, .fa-brand
 	background: var(--bg3);
 	color: inherit;
 }
+.input:read-only {
+	background: color-mix(in srgb, var(--bg1), var(--bg3));
+	border-color: color-mix(in srgb, var(--border1), var(--bg3));
+	user-select: all;
+}
 :is(.input, .select).isSmaller {
 	font-size: 0.875rem;
 	line-height: 2.25rem;
@@ -340,8 +356,11 @@ button:not(.basicIcon, .posterButton-info) :is(.fa-solid, .fa-regular, .fa-brand
 }
 :is(.input, .select):is(:hover, :focus-visible) {
 	outline: none;
+}
+:is(.input, .select):not(:read-only):is(:hover, :focus-visible) {
 	border-color: var(--accent);
 }
+
 
 .radioGroup {
 	display: flex;
@@ -983,7 +1002,14 @@ button:not(.basicIcon, .posterButton-info) :is(.fa-solid, .fa-regular, .fa-brand
 }
 
 .searchCont {
-	padding: 1.25rem 1.5rem;
+	padding: 1.25rem 1.5rem 1.5rem;
+}
+.qr-canvas {
+	border: 1px solid var(--border1);
+	background-color: var(--bg3);
+	display: block;
+	width: 100% !important;
+	height: auto !important;
 }
 
 /* generator */
@@ -1143,9 +1169,9 @@ button:not(.basicIcon, .posterButton-info) :is(.fa-solid, .fa-regular, .fa-brand
 .postersSlider .poster:last-child {
 	margin-right: auto;
 }
-.poster:is(.isCurrentLR, .isCurrent) {
+/* .poster:is(.isCurrentLR, .isCurrent) {
 	transform: scale(1.05);
-}
+} */
 .poster-imgCont {
 	position: relative;
 	background-color: var(--bg3);
@@ -1222,7 +1248,7 @@ button:not(.basicIcon, .posterButton-info) :is(.fa-solid, .fa-regular, .fa-brand
 	top: .5625rem;
 	filter: drop-shadow(0px 0px 1px black);
 }
-.poster-viewed, .poster .movieInfo-rating, .posterButton-info {
+.poster-viewed, .poster .movieInfo-rating {
 	right: .625rem;
 }
 .poster-loved, .posterButton-info {
@@ -1571,6 +1597,9 @@ button:not(.basicIcon, .posterButton-info) :is(.fa-solid, .fa-regular, .fa-brand
 	}
 	.header-buttons button.buttonDark.isIconOnly::after {
 		content: attr(title);
+	}
+	.header-buttons .buttonUnstyled.isSorted::before, .header-buttons .buttonUnstyled.isError::before {
+		left: 1.75rem;
 	}
 
 	.moviesPage {

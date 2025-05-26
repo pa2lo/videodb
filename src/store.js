@@ -3,29 +3,51 @@ import { useStorage } from "./composables/useStorage"
 
 export const lang = useStorage('lang', 'sk')
 export const listsort = useStorage('listsort', '')
-export const dubOnly = useStorage('dubOnly', 'yes')
+export const streamsLang = useStorage('streamsLang', 2)
+export const incHDR = useStorage('incHDR', 1)
+export const incDV = useStorage('incHDR', 0)
 export const token = useStorage('token', null)
 export const downloadToken = useStorage('downloadToken', null)
 export const tokenDate = useStorage('tokenDate', null)
 export const uid = useStorage('uid', `9802BF2F-C445-552D-A3EE-${Date.now()}`, true)
 export const downloadHistory = useStorage('downloadHistory', [])
-export const favs = useStorage('favs', [])
+export const favItems = useStorage('favItems', [])
 export const generatorShows = useStorage('generatorShows', ["4158", "3757", "14264", "3670", "7410", "4245", "3844", "3903", '11518', '14601', '9719', '3824', '3744', '14362'])
 export const generatorQuality = useStorage('generatorQuality', 'medium')
 export const generatorShowsHistory = useStorage('generatorShowsHistory', [])
 export const bookmarks = useStorage('bookmarks', [])
-export const seriesHistory = useStorage('seriesHistory', [])
-export const moviesHistory = useStorage('moviesHistory', [])
 export const theme = useStorage('theme', '')
 export const hpWidgets = useStorage('hpWidgets', ["wm-01","ws-01","ws-last","favs"])
 export const winPlayer = useStorage('winPlayer', 'pot')
+export const androidPlayer = useStorage('androidPlayer', 'mpv')
+export const iosPlayer = useStorage('iosPlayer', 'vlc')
+
+export const syncKey = useStorage('syncKey', '')
+export const syncTS = useStorage('syncTS', '')
+export const syncAdded = useStorage('syncAdded', '')
+export const syncing = ref(false)
+export const syncError = ref('')
 
 export const currentPage = ref(null)
 export const currentItemInfo = ref(null)
-export const widgetsCache = ref({})
 export const toasts = ref([])
+export const gCastAvailable = ref(false)
+export const gCastConnected = ref(false)
 
 export const ignoreMouseEvents = ref(false)
+
+export function getQueryParams() {
+	const params = new URLSearchParams({
+		DV: incDV.value,
+		HDR: incHDR.value,
+		lang: lang.value,
+		uid: uid.value,
+		ver: '2.0'
+	})
+	if (streamsLang.value > 0) params.append('dub', 1)
+	if (streamsLang.value == 1) params.append('tit', 1)
+	return params.toString()
+}
 
 // maps
 export const widgetsMap = {
@@ -53,8 +75,8 @@ export const widgetsMap = {
 			cs: 'Filmy - Netflix',
 			en: 'Movies - Netflix'
 		},
-		fetchUrl: '/Search/getList/99?DV=0&HDR=1&gen=1&limit=30&od=desc&of=mindate',
-		url: '/Search/getList/99?DV=0&HDR=1&gen=1&limit=30&od=desc&of=mindate'
+		fetchUrl: '/Search/getList/99?gen=1&limit=30&od=desc&of=mindate',
+		url: '/Search/getList/99?gen=1&limit=30&od=desc&of=mindate'
 	},
 	'wm-04': {
 		sectionTitle: {

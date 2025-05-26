@@ -1,7 +1,7 @@
 <script setup>
 import { ref, shallowReactive, onBeforeMount, onBeforeUnmount, computed, watch, nextTick } from 'vue'
 
-import { reformatString, slugify } from './helpers'
+import { fixRating, reformatString, slugify } from './helpers'
 import { t } from './labels'
 
 import BButton from './components/BButton.vue'
@@ -11,16 +11,16 @@ import MediaInfo from './components/MediaInfo.vue'
 import HelpModalContent from './components/HelpModalContent.vue'
 import AppSettings from './components/AppSettings.vue'
 import DownloadLink from './components/DownloadLink.vue'
+import SyncModalContent from './components/SyncModalContent.vue'
 
-import { lang, listsort, dubOnly, token, downloadToken, tokenDate, uid, downloadHistory, favs, generatorShows, generatorQuality, generatorShowsHistory, bookmarks, seriesHistory, moviesHistory, theme, hpWidgets, winPlayer, widgetsMap, currentPage, currentItemInfo, widgetsCache, toasts, showToast, destroyToast, showsMap, searchIdMap, genresMap, homepageLinks, moviesAdditionalLinks, ignoreMouseEvents } from './store'
-import { getProxyData } from './helpers'
-
-const queryParam = computed(() => {
-	return `${dubOnly.value == 'yes' ? 'dub=1&' : ''}lang=${lang.value}&uid=${uid.value}&ver=2.0`
-})
+import { lang, listsort, streamsLang, token, downloadToken, tokenDate, uid, downloadHistory, favItems, generatorShows, generatorQuality, generatorShowsHistory, bookmarks, theme, hpWidgets, winPlayer, androidPlayer, iosPlayer, widgetsMap, currentPage, currentItemInfo, toasts, showToast, destroyToast, showsMap, searchIdMap, genresMap, homepageLinks, moviesAdditionalLinks, ignoreMouseEvents, getQueryParams, syncKey, syncError, syncing, gCastAvailable, gCastConnected } from './store'
+import { getProxyData, abortSignalAny } from './helpers'
+import { sync } from './sync'
+import { gCast } from './gCast'
 
 const PLUGIN_URL = import.meta.env.VITE_PLUGIN_URL
 const SERVICE_URL = import.meta.env.VITE_SERVICE_URL
+const SITE_URL = import.meta.env.VITE_SITE_URL
 const DOWNLOAD_SERVICE_URL = import.meta.env.VITE_DOWNLOAD_SERVICE_URL
 
 // OS
@@ -102,6 +102,7 @@ const showSettingsModal = ref(false)
 const showInfoModal = ref(false)
 const showHelpModal = ref(false)
 const showCurrentSortModal = ref(false)
+const showSyncModal = ref(false)
 
 // install
 const installPromptCancelled = ref(localStorage.getItem('installClosed'))
@@ -160,51 +161,22 @@ function setCurrentSortBy(by) {
 	currentPage.value.sortBy = by
 	showCurrentSortModal.value = false
 }
+const sortFunctions = {
+	rating: (a, b) => (b?.info?.rating ?? 0) - (a?.info?.rating ?? 0),
+	newest: (a, b) => (b?.info?.year ?? 0) - (a?.info?.year ?? 0),
+	oldest: (a, b) => (a?.info?.year ?? 2100) - (b?.info?.year ?? 2100),
+	longest: (a, b) => (b?.info?.duration ?? 0) - (a?.info?.duration ?? 0),
+	shortest: (a, b) => (a?.info?.duration ?? Number.MAX_SAFE_INTEGER) - (b?.info?.duration ?? Number.MAX_SAFE_INTEGER)
+}
 const sortedList = computed(() => {
-	let reducedArr = []
-	if (currentPage.value?.data?.system?.setContent == 'movies') {
-		let reducedIds = []
-		reducedArr = Object.values(currentPage.value?.data?.menu.reduce((acc, current) => {
-			let key = current.id || current.url
-			if (!reducedIds.includes(key)) {
-				reducedIds.push(key)
-				acc.push(current)
-			}
-			return acc
-		}, []))
-	} else reducedArr = currentPage.value?.data?.menu
+	let items = currentPage.value?.data?.menu || []
 
-	let reducedArr2
-	let sortBy = currentPage.value?.sortBy || listsort.value
-	if (sortBy == '') reducedArr2 = reducedArr
-	else if (sortBy == 'rating') reducedArr2 = reducedArr.toSorted((a, b) => {
-		let ra = a?.info?.rating ?? 0
-		let rb = b?.info?.rating ?? 0
-		if (ra > 0 && ra < 1) ra * 10
-		if (rb > 0 && rb < 1) rb * 10
-		return rb - ra
-	})
-	else if (sortBy == 'newest' || sortBy == 'oldest') {
-		let defaultLength = sortBy == 'newest' ? 0 : 2100
-		reducedArr2 = reducedArr.toSorted((a, b) => {
-			let ra = a?.info?.year ?? defaultLength
-			let rb = b?.info?.year ?? defaultLength
-			return sortBy == 'newest' ? rb - ra : ra - rb
-		})
-	}
-	else if (sortBy == 'longest' || sortBy == 'shortest') {
-		let defaultLength = sortBy == 'longest' ? 0 : 999999999
-		reducedArr2 = reducedArr.toSorted((a, b) => {
-			let ra = a?.info?.duration ?? defaultLength
-			let rb = b?.info?.duration ?? defaultLength
-			return sortBy == 'longest' ? rb - ra : ra - rb
-		})
-	}
+	const sortBy = currentPage.value?.sortBy || listsort.value
+	if (sortBy && sortFunctions[sortBy]) items = items.toSorted(sortFunctions[sortBy])
 
-	let l = reducedArr2.length
-	return reducedArr2.map((item, index, arr) => {
-		if (index == 0) item.isFirst = true
-		if ((index == l-1 && item?.type != 'next') || (index == l-2 && arr[index+1]?.type == 'next')) item.isLast = true
+	return items.map((item, index, arr) => {
+		if (index === 0) item.isFirst = true
+		if ((index === arr.length - 1 && item?.type !== 'next') || (index === arr.length - 2 && arr[index + 1]?.type === 'next')) item.isLast = true
 		return item
 	})
 })
@@ -247,31 +219,28 @@ function toggleBookmark() {
 		})
 		showToast(t('Page added to bookmarks'), 'check')
 	}
+	sync.update('bookmarks')
 }
 
 // favs
 function toggleFav() {
-	if (!currentItemInfo.value?.id) return
+	if (!currentItemInfo.value?.id || isNaN(currentItemInfo.value.id)) return
 
-	if (favs.value.some(fav => fav?.id == currentItemInfo.value.id)) {
-		let existingFav = favs.value.find(fav => fav.id == currentItemInfo.value.id)
-		favs.value = favs.value.filter(fav => fav != existingFav)
-		showToast(t(existingFav.type == 'dir' ? 'Series removed from favorites' : 'Video removed from favorites'), 'check')
+	if (favItems.value.some(fav => fav?.id == currentItemInfo.value.id)) {
+		let existingFav = favItems.value.find(fav => fav.id == currentItemInfo.value.id)
+		favItems.value = favItems.value.filter(fav => fav != existingFav)
+		showToast(t(existingFav.type == 'dir' ? 'Show removed from favorites' : 'Video removed from favorites'), 'check')
 	} else {
-		let data = currentItemInfo.value
-		if (['episodes', 'seasons'].includes(currentPage.value?.data?.system?.setContent)) {
-			let lastSeason = customHistory.value.findLast(hitem => hitem.page?.data?.system?.setContent == 'seasons')
-			data = lastSeason?.page || currentPage.value
+		let data = {
+			id: currentItemInfo.value.id,
+			type: ['episodes', 'seasons'].includes(currentPage.value?.data?.system?.setContent) ? 'dir' : currentItemInfo.value.type
 		}
 
-		if (!data?.info?.year) return
+		favItems.value.unshift(data)
 
-		favs.value.unshift({
-			...getLinkData(data)
-		})
-
-		showToast(t(data.type == 'dir' ? 'Series added to favorites' : 'Video added to favorites'), 'check')
+		showToast(t(data.type == 'dir' ? 'Show added to favorites' : 'Video added to favorites'), 'check')
 	}
+	sync.update('favs')
 }
 
 // pages content
@@ -333,10 +302,10 @@ function setHistoryContent(index) {
 }
 
 let homePageInit = false
-async function getHomePage(reload) {
-	if (reload) widgetsCache.value = {}
-
+async function getHomePage(reload, loadSync) {
 	appState.loading = true
+
+	if (loadSync) await sync.onInit()
 
 	requestAnimationFrame(() => {
 		currentPage.value = {
@@ -362,7 +331,7 @@ async function getHomePage(reload) {
 
 async function getUrlContent(url, customUrl) {
 	let destination = customUrl ? customUrl : url
-	if (!destination?.startsWith(PLUGIN_URL)) destination = url?.includes('&uid=') ? `${PLUGIN_URL}${url}` : `${PLUGIN_URL}${url}${url.includes('?') ? '&' : '?'}${queryParam.value}`
+	if (!destination?.startsWith(PLUGIN_URL)) destination = url?.includes('&uid=') ? `${PLUGIN_URL}${url}` : `${PLUGIN_URL}${url}${url.includes('?') ? '&' : '?'}${getQueryParams()}`
 
 	const page = await getProxyData(destination)
 
@@ -371,9 +340,10 @@ async function getUrlContent(url, customUrl) {
 		showToast(t('The folder is empty'))
 		return false
 	} else if (page?.menu) {
-		page.menu.map(item => {
-			if (item.info?.rating && item.info.rating > 0 && item.info.rating < 1) item.info.rating = parseFloat((item.info.rating * 10).toFixed(2))
-		})
+		fixRating(page.menu)
+
+		if (page.system?.setContent === 'movies') page.menu = page.menu.filter((item, index, arr) => arr.findIndex(x => (x.id || x.url) === (item.id || item.url)) === index)
+
 		if (url == '/FMovies') page?.menu?.push(...moviesAdditionalLinks)
 	}
 
@@ -449,6 +419,21 @@ function reportFetchError(error) {
 }
 
 // download
+async function getShortenedLink(link) {
+	try {
+		let res = await fetch(`${DOWNLOAD_SERVICE_URL}/shorten.php`, {
+			method: 'POST',
+			body: new URLSearchParams({link})
+		})
+		let resJSON = await res.json()
+
+		if (resJSON.success && resJSON.id) return `${SITE_URL}/server/r/${resJSON.id}`
+		return link
+	} catch (error) {
+		console.log(error)
+		return link
+	}
+}
 async function showDownload(link) {
 	if (link?.url && currentItemInfo.value?.url != link.url) setCurrentItemInfo(link)
 	if (ignoreMouseEnter) return
@@ -466,7 +451,7 @@ async function showDownload(link) {
 	})
 
 	try {
-		const data = await getProxyData(`${PLUGIN_URL}/${link.url}?${queryParam.value}`)
+		const data = await getProxyData(`${PLUGIN_URL}/${link.url}${link.url.includes('?') ? '&' : '?'}${getQueryParams()}`)
 
 		downloadStreams.data = data
 		downloadStreams.loading = false
@@ -476,7 +461,7 @@ async function showDownload(link) {
 		console.log(error)
 	}
 }
-async function downloadFile(stream, playLink, enqueue) {
+async function downloadFile(stream, playLink, enqueue, castToDevice) {
 	if (downloadStreams.show) {
 		if (downloadStreams.loadingLink == stream.url) return
 
@@ -488,32 +473,44 @@ async function downloadFile(stream, playLink, enqueue) {
 
 	let newLink = await getDownloadLink(stream.url)
 
+	if (newLink && isIOS && iosPlayer.value == 'vlc') newLink = await getShortenedLink(newLink)
+
 	if (!newLink) {
 		if (downloadStreams.show) downloadStreams.loadingLink = ''
 		return
 	}
 
-	const alink = document.createElement('a')
-	alink.download = stream?.filename || ''
-	alink.setAttribute('referrerpolicy', "no-referrer")
-	alink.rel = "noopener,noreferrer"
-	alink.href = getSystemLink(newLink, playLink, enqueue)
-	alink.click()
+	if (castToDevice) {
+		gCast.stream(newLink)
+	} else {
+		const alink = document.createElement('a')
+		alink.download = stream?.filename || ''
+		alink.setAttribute('referrerpolicy', "no-referrer")
+		alink.rel = "noopener,noreferrer"
+		alink.href = getSystemLink(newLink, playLink, enqueue)
+		alink.click()
+	}
 
 	if (downloadStreams.show) downloadStreams.loadingLink = ''
 
-	if (downloadStreams.link && !downloadHistory.value.includes(downloadStreams.link)) downloadHistory.value.push(downloadStreams.link)
-
-	if (currentPage.value?.data?.system?.setContent == 'episodes') updateSeriesHistory()
-	else if (!currentPage.value?.type != 'generator' && currentItemInfo.value?.type == 'video') unshiftHistoryItem(moviesHistory.value, currentItemInfo.value)
+	if (downloadStreams.link && downloadHistory.value[downloadHistory.value.length - 1] != downloadStreams.link) {
+		if (downloadHistory.value.includes(downloadStreams.link)) downloadHistory.value.splice(downloadHistory.value.indexOf(downloadStreams.link), 1)
+		downloadHistory.value.push(downloadStreams.link.split('?')[0])
+		sync.update('history')
+	}
 }
 async function copyFileLink(stream) {
 	let newLink = await getDownloadLink(stream.url)
 
 	if (!newLink) return
 
-	await navigator.clipboard.writeText(newLink)
-	showToast(t('Link copied to clipboard'), 'check')
+	// safari timeout hack
+	setTimeout(() => {
+		navigator.clipboard.write([
+			new ClipboardItem({	'text/plain': newLink }),
+		])
+		showToast(t('Link copied to clipboard'), 'check')
+	}, 0)
 }
 function setNextStreamAsCurrent(down) {
 	let currentIndex = downloadStreams.data.strms.findIndex(stream => stream.url == downloadStreams.current?.url)
@@ -538,34 +535,8 @@ function removeFromDownloadHistory(url) {
 	if (!downloadHistory.value.includes(url)) return
 	let index = downloadHistory.value.findIndex(h => h == url)
 	downloadHistory.value.splice(index, 1)
+	sync.update('history')
 	showToast(t('Video removed from watch list'), 'check')
-
-	let splitArr = url.split('/')
-	let itemId = splitArr[2]
-	let list = splitArr.length == 3 ? moviesHistory.value : seriesHistory.value
-
-	if (splitArr.length != 3 && downloadHistory.value.some(hitem => hitem.includes(`/Play/${itemId}/`))) return
-	if (!list.some(hitem => hitem.id == itemId)) return
-	list.splice(list.findIndex(hitem => hitem.id == itemId), 1)
-}
-function updateSeriesHistory() {
-	let lastSeason = customHistory.value.findLast(hitem => hitem.page?.data?.system?.setContent == 'seasons')
-	let lastSeasonPage = lastSeason?.page || currentPage.value
-
-	unshiftHistoryItem(seriesHistory.value, lastSeasonPage)
-}
-function unshiftHistoryItem(historyType, item) {
-	let lastItemHistoryIndex = historyType.findIndex(shItem => shItem.url == item.url)
-
-	if (!item.i18n_art?.[lang.value]?.poster && !item.info?.year) return
-
-	if (lastItemHistoryIndex > -1) historyType.splice(lastItemHistoryIndex, 1)
-
-	historyType.unshift({
-		...getLinkData(item),
-		title: item.title || null
-	})
-	historyType.splice(20, 5)
 }
 
 // search
@@ -631,10 +602,10 @@ async function getRandomShowsEpisode(ignoreHistory) {
 	let episode
 
 	try {
-		const seasonsFetchData = await getProxyData(`${PLUGIN_URL}/FGet/${showId}?${queryParam.value}`)
+		const seasonsFetchData = await getProxyData(`${PLUGIN_URL}/FGet/${showId}?${getQueryParams()}`)
 		const season = seasonsFetchData.menu[Math.floor(Math.random() * seasonsFetchData.menu.length)]
 
-		const episodesFetchData = await getProxyData(`${PLUGIN_URL}/${season.url}?${queryParam.value}`)
+		const episodesFetchData = await getProxyData(`${PLUGIN_URL}/${season.url}?${getQueryParams()}`)
 		episode = episodesFetchData.menu[Math.floor(Math.random() * episodesFetchData.menu.length)]
 	} catch (error) {
 		showToast(t('Error loading data'))
@@ -643,7 +614,7 @@ async function getRandomShowsEpisode(ignoreHistory) {
 	if (generatorShowsHistory.value.some(hitem => hitem.epUrl == episode.url)) return getRandomShowsEpisode(true)
 
 	try {
-		const streamsFetchData = await getProxyData(`${PLUGIN_URL}/${episode.url}?${queryParam.value}`)
+		const streamsFetchData = await getProxyData(`${PLUGIN_URL}/${episode.url}?${getQueryParams()}`)
 		streamsFetchData.strms.map(stream => {
 			stream.size = stream.size.includes('GB') ? parseFloat(stream.size)*1000 : parseFloat(stream.size)
 		})
@@ -783,16 +754,20 @@ function destroyTrailer() {
 
 // login logout
 onBeforeMount(() => {
+	runUpdater()
+
 	if (tokenDate.value && (Date.now() - tokenDate.value > 86400000)) {
 		logout()
 		appState.autoLogin = true
-	} else if (token.value) getHomePage()
+	} else if (token.value) getHomePage(false, true)
 
 	window.addEventListener('beforeinstallprompt', (e) => {
 		e.preventDefault()
 		if (!installPromptCancelled.value) showInstallPrompt.value = true
 		installPrompt.value = e
 	})
+
+	// gCast.init(true)
 })
 onBeforeUnmount(() => {
 	if (currentPage.value) window.removeEventListener('popstate', onPopState)
@@ -832,7 +807,7 @@ async function getToken() {
 					downloadToken.value = newDownloadToken
 					tokenDate.value = Date.now()
 
-					getHomePage()
+					getHomePage(false, true)
 
 					appState.krUser = ''
 					appState.krPass = ''
@@ -869,8 +844,6 @@ async function getDownloadToken(session_id) {
 
 		if (!fileListJSON.data?.[0]?.ident) return false
 
-		console.log(`/file/list ident - ${fileListJSON.data[0].ident}`)
-
 		const fileDownload = await fetch(`${SERVICE_URL}/file/download`, {
 			method: 'POST',
 			headers: {'Content-Type': 'application/json'},
@@ -879,8 +852,6 @@ async function getDownloadToken(session_id) {
 		const fileDownloadJSON = await fileDownload.json()
 
 		if (!fileDownloadJSON?.data?.link) return false
-
-		console.log(`/file/list link - ${fileDownloadJSON.data.link}`)
 
 		const tokenData = await fetch(`${DOWNLOAD_SERVICE_URL}/getTokenContent.php`, {
 			method: 'POST',
@@ -932,6 +903,20 @@ function showCurrentItemInfo() {
 }
 
 // helpers
+function runUpdater() {
+	// Update 05/25
+	if (localStorage.getItem('seriesHistory')) localStorage.removeItem('seriesHistory')
+	if (localStorage.getItem('moviesHistory')) localStorage.removeItem('moviesHistory')
+	if (localStorage.getItem('dubOnly')) localStorage.removeItem('dubOnly')
+	if (localStorage.getItem('favs')) {
+		favItems.value = JSON.parse(localStorage.getItem('favs')).map(({id, type}) => ({ id, type }))
+		localStorage.removeItem('favs')
+	}
+	if (localStorage.getItem('onlyDub')) {
+		streamsLang.value = 0
+		localStorage.removeItem('onlyDub')
+	}
+}
 function getCurrentFocusableItem() {
 	return mainEl.value.querySelector('.isCurrentLR') || mainEl.value.querySelector('.isCurrent')
 }
@@ -945,7 +930,7 @@ async function getDownloadLink(url) {
 
 		downloadController = new AbortController()
 
-		const id = await getProxyData(`${PLUGIN_URL}/${url}?${queryParam.value}`, downloadController.signal)
+		const id = await getProxyData(`${PLUGIN_URL}/${url}?${getQueryParams()}`, downloadController.signal)
 
 		if (!id?.ident) {
 			downloadStreams.error = t('Error loading ID')
@@ -956,13 +941,14 @@ async function getDownloadLink(url) {
 			method: 'POST',
 			headers: {'Content-Type': 'application/json'},
 			body: `{"session_id":"${token.value}","data":{"ident":"${id.ident}"}}`,
-			signal: AbortSignal.any([downloadController.signal, AbortSignal.timeout(10000)])
+			signal: abortSignalAny([downloadController.signal, AbortSignal.timeout(10000)])
 		}
 
 		const response2 = await fetch(`${SERVICE_URL}/file/download`, options)
 		const res = await response2.json()
 		if (!res?.data?.link) {
 			downloadStreams.error = t('Error loading URL')
+			if (response2.status == 401) logout()
 			return false
 		}
 
@@ -995,72 +981,23 @@ function getSystemLink(url, playLink, enqueue) {
 	if (!playLink) return url
 
 	if (isMac) return `iina://weblink?url=${encodeURI(url)}${enqueue ? '&enqueue=1' : ''}`
-	else if (isAndroid) return `vlc://${url.replace('https://', '')}`
-	else if (isIOS) return `vlc-x-callback://x-callback-url/stream?url=${url}`
-	else if (isWindows && winPlayer.value == 'pot') return `potplayer://${url}${enqueue ? ' /add' : ''}`
+	else if (isAndroid && androidPlayer.value == 'mpv') return `intent://${url.replace('https://', '')}#Intent;type=video/any;package=is.xyz.mpv;scheme=https;end;`
+	else if (isAndroid && androidPlayer.value == 'vlc') return `vlc://${url.replace('https://', '')}`
+	else if (isIOS && iosPlayer.value == 'vlc') return `vlc-x-callback://x-callback-url/stream?url=${encodeURI(url)}`
+	else if (isIOS && iosPlayer.value == 'vlc2') return `vlc://${encodeURI(url.replace('https://', ''))}`
+	else if (isIOS && iosPlayer.value == 'nplayer') return `nplayer-${encodeURI(url)}`
+	else if (isWindows && winPlayer.value == 'pot') return `potplayer://${encodeURI(url)}${enqueue ? ' /add' : ''}`
 	else if (isWindows && winPlayer.value == 'vlc') return `${enqueue ? 'vlcenqueue' : 'vlcplay'}://${url}`
 }
 function getLinkData(link, url) {
-	return {
-		cast: link?.cast ? link.cast.slice(0, 7) : null,
-		i18n_art: {
-			sk: {
-				fanart: link?.i18n_art?.sk?.fanart || null,
-				poster: link?.i18n_art?.sk?.poster || null
-			},
-			cs: {
-				fanart: link?.i18n_art?.cs?.fanart || null,
-				poster: link?.i18n_art?.cs?.poster || null
-			},
-			en: {
-				fanart: link?.i18n_art?.en?.fanart || null,
-				poster: link?.i18n_art?.en?.poster || null
-			}
-		},
-		i18n_info: {
-			sk: {
-				genre: link?.i18n_info?.sk?.genre || null,
-				country: link?.i18n_info?.sk?.country || null,
-				plot: link?.i18n_info?.sk?.plot || null,
-				otitle: link?.i18n_info?.sk?.otitle || null
-			},
-			cs: {
-				genre: link?.i18n_info?.cs?.genre || null,
-				country: link?.i18n_info?.cs?.country || null,
-				plot: link?.i18n_info?.cs?.plot || null,
-				otitle: link?.i18n_info?.cs?.otitle || null
-			},
-			en: {
-				genre: link?.i18n_info?.en?.genre || null,
-				country: link?.i18n_info?.en?.country || null,
-				plot: link?.i18n_info?.en?.plot || null,
-				otitle: link?.i18n_info?.en?.otitle || null
-			},
-		},
-		info: {
-			director: link?.info?.director ? link.info.director.slice(0, 6) : null,
-			mpaa: link?.info?.mpaa || null,
-			rating: link?.info?.rating || null,
-			year: link?.info?.year || null,
-			trailer: link?.info?.trailer || null
-		},
-		stream_info: {
-			langs: link?.stream_info?.langs || null,
-			video: {
-				duration: link?.stream_info?.video?.duration || null
-			}
-		},
-		unique_ids: {
-			csfd: link?.unique_ids?.csfd || null,
-			imdb: link?.unique_ids?.imdb || null
-		},
-		type: link?.type || null,
-		id: link?.id || Date.now(),
-		url: url ? url : link?.url || null
-	}
+	if (link.cast) link.cast.slice(0, 7)
+	if (link?.info?.director) link.info.director.slice(0, 6)
+	if (!link.id) link.id = Date.now()
+	link.url = url ? url : link?.url || null
+	return link
 }
 function getSearchUrl(type, value) {
-	return `${PLUGIN_URL}/Search/${type}?gen=1&id=${type}&ms=1&search=${value.replace(' ', '+')}&${queryParam.value}`
+	return `${PLUGIN_URL}/Search/${type}?gen=1&id=${type}&ms=1&search=${value.replace(' ', '+')}&${getQueryParams()}`
 }
 
 // main key events
@@ -1125,6 +1062,7 @@ watch(theme, () => {
 
 // after import
 function afterImport() {
+	showSyncModal.value = false
 	showSettingsModal.value = false
 	if (currentHistoryIndex.value > 0) windowHistory.go(-currentHistoryIndexDiff.value)
 	else getHomePage(true)
@@ -1182,9 +1120,11 @@ function afterImport() {
 					<div class="header-buttons flex ai-c">
 						<BButton dark smaller class="buttonUnstyled" :class="{isSorted: currentPage?.sortBy}" icon="fa-solid fa-arrow-down-short-wide" :disabled="!['movies', 'tvshows'].includes(currentPage?.data?.system?.setContent)" @click.prevent="showCurrentSortModal = true" :title="t('List sort')" />
 						<BButton dark smaller class="buttonUnstyled" :icon="isInBookmarks ? 'fa-solid fa-bookmark' : 'fa-regular fa-bookmark'" :disabled="!currentPage?.url" @click.prevent="toggleBookmark" :title="isInBookmarks ? t('Remove from bookmarks') : t('Add to bookmarks')" />
-						<BButton dark smaller class="buttonUnstyled" icon="fa-solid fa-arrows-rotate" @click.prevent="refreshPage" :title="t('Refresh page')" />
+						<!-- <BButton dark smaller class="buttonUnstyled" icon="fa-solid fa-rotate-right" @click.prevent="refreshPage" :title="t('Refresh page')" /> -->
 						<BButton dark smaller class="buttonUnstyled" icon="fa-solid fa-search" :title="t('Search')" @click="showSearch" />
+						<BButton v-if="gCastConnected" dark smaller class="buttonUnstyled isSorted" icon="fa-brands fa-chromecast" :title="t('Disconnect device')" @click="disconnectGCast" />
 						<BButton v-if="installPrompt || iOsInstallPrompt" class="buttonUnstyled" dark smaller icon="fa-solid fa-cloud-arrow-down" :title="t('Download App')" @click.prevent="installApp" />
+						<BButton dark smaller class="buttonUnstyled" :class="{isSorted: syncKey && !syncError, isError: syncKey && syncError}" :icon="`fa-solid fa-arrows-rotate ${syncing ? 'fa-spin' : ''}`" :title="t('Synchronization')" @click.prevent="showSyncModal = true" />
 						<BButton dark smaller class="buttonUnstyled" icon="fa-solid fa-gear" :title="t('Settings')" @click.prevent="showSettingsModal = true" />
 						<BButton dark smaller class="buttonUnstyled" icon="fa-solid fa-question" :title="t('Help')" @click.prevent="showHelpModal = true" />
 						<BButton dark smaller class="buttonUnstyled" icon="fa-solid fa-right-from-bracket" :title="t('Logout')" @click.prevent="logout" />
@@ -1207,7 +1147,7 @@ function afterImport() {
 								</div>
 							</template>
 						</div>
-						<div v-if="currentPage?.type == 'home' && bookmarks.length" class="generatorSection dirLinks divided">
+						<div v-if="currentPage?.type == 'home' && bookmarks.length" class="dirLinks divided">
 							<template v-for="link in bookmarks">
 								<div class="dirLink isFocusable" :class="{isCurrent: currentItemInfo && ((currentItemInfo.url && currentItemInfo.url == link.url) || (currentItemInfo.id && currentItemInfo.id == link.id))}" @click.prevent="visitLink(link)" @pointerenter="!ignoreMouseEvents && setCurrentItemInfo(link)" @itementer="setCurrentItemInfo(link, true)">
 									<div class="dirLink-title" v-html="reformatString(link.title[lang])"></div>
@@ -1219,7 +1159,6 @@ function afterImport() {
 								<HomeWidget
 									v-if="hpWidgets.includes(key)"
 									:id="key"
-									:queryParam
 									@showDownload="showDownload"
 									@setCurrentItemInfo="setCurrentItemInfo"
 									@removeFromDownloadHistory="removeFromDownloadHistory"
@@ -1231,7 +1170,7 @@ function afterImport() {
 						<div v-else-if="currentPage?.url == '/FMovies'" class="homeWidgets">
 							<HomeWidget
 								id="wm-last"
-								:grid="!favs.some(fav => fav.type == 'video')"
+								:grid="!favItems.some(fav => fav.type == 'video')"
 								@showDownload="showDownload"
 								@setCurrentItemInfo="setCurrentItemInfo"
 								@removeFromDownloadHistory="removeFromDownloadHistory"
@@ -1252,7 +1191,7 @@ function afterImport() {
 						<div v-else-if="currentPage?.url == '/FSeries'" class="homeWidgets">
 							<HomeWidget
 								id="ws-last"
-								:grid="!favs.some(fav => fav.type == 'dir')"
+								:grid="!favItems.some(fav => fav.type == 'dir')"
 								@showDownload="showDownload"
 								@setCurrentItemInfo="setCurrentItemInfo"
 								@removeFromDownloadHistory="removeFromDownloadHistory"
@@ -1279,10 +1218,10 @@ function afterImport() {
 							<template v-for="link in sortedList">
 								<div v-if="!link.action" class="movieLink isFocusable flex ai-c" :class="{isCurrent: currentItemInfo && currentItemInfo.url == link.url}" @click="showDownload(link)" @pointerenter="!ignoreMouseEvents && setCurrentItemInfo(link)" @itementer="setCurrentItemInfo(link, true)">
 									<span class="movieLink-title" v-html="reformatString(link.i18n_info[lang].title)"></span>
-									<i v-if="link?.type == 'video' && link?.url && downloadHistory.includes(link.url)" class="fa-regular fa-eye"></i>
-									<i v-else-if="currentPage?.data?.system?.setContent == 'seasons' && link?.url && downloadHistory.some(hitem => hitem.includes(`/Play/${link?.id}/${link?.info?.season}/`))" class="fa-regular fa-eye"></i>
-									<i v-else-if="currentPage?.data?.system?.setContent != 'seasons' && link?.type == 'dir' && link.url && downloadHistory.some(hitem => hitem.includes(`/Play/${link?.id}/`))" class="fa-regular fa-eye"></i>
-									<i v-if="link.id && ['movies', 'tvshows'].includes(currentPage?.data?.system?.setContent) && favs.some(fav => fav.id == link.id)" class="fa-solid fa-heart"></i>
+									<i v-if="link?.type == 'video' && link?.url && downloadHistory.includes(link.url.split('?')[0])" class="fa-solid fa-check"></i>
+									<i v-else-if="currentPage?.data?.system?.setContent == 'seasons' && link?.url && downloadHistory.some(hitem => hitem.includes(`/Play/${link?.id}/${link?.info?.season}/`))" class="fa-solid fa-check"></i>
+									<i v-else-if="currentPage?.data?.system?.setContent != 'seasons' && link?.type == 'dir' && link.url && downloadHistory.some(hitem => hitem.includes(`/Play/${link?.id}/`))" class="fa-solid fa-check"></i>
+									<i v-if="link.id && ['movies', 'tvshows'].includes(currentPage?.data?.system?.setContent) && favItems.some(fav => fav.id == link.id)" class="fa-solid fa-heart"></i>
 									<span v-if="link?.info?.rating" class="movieLink-rating" :class="{isAverage: link?.info?.rating < 7.5 && link?.info?.rating > 4, isBad: link?.info?.rating <= 4}"></span>
 									<div class="movieLink-mobileLi movieLink-mobileLi-mobile" v-if="link.type != 'next'" @click.stop="showCurrentItemInfo">
 										<i class="fa-solid fa-info"></i>
@@ -1432,10 +1371,10 @@ function afterImport() {
 			</BModal>
 			<BModal v-model:open="downloadStreams.show" :title="t('Select stream')" @keydown="onDownloadModalKeydown">
 				<template #buttons>
-					<BButton v-if="downloadStreams.link && downloadHistory.includes(downloadStreams.link)" class="modal-button" icon="fa-regular fa-eye-slash" :title="t('Remove from watch list')" @click="removeFromDownloadHistory(downloadStreams.link)" />
+					<BButton v-if="downloadStreams.link && downloadHistory.includes(downloadStreams.link.split('?')[0])" class="modal-button" icon="fa-solid fa-check" :title="t('Remove from watch list')" @click="removeFromDownloadHistory(downloadStreams.link.split('?')[0])" />
 				</template>
 				<Transition name="maxHeight">
-					<div v-if="downloadStreams.error" class="loginBox-error">
+					<div v-if="downloadStreams.error" class="loginBox-error modal-error">
 						{{ downloadStreams.error }}
 					</div>
 				</Transition>
@@ -1482,7 +1421,7 @@ function afterImport() {
 			</BModal>
 			<BModal v-model:open="searchData.genreSearchShow" narrow :title="`${t('Search')} ${searchIdMap['by-genre'][lang]}`">
 				<form class="searchCont" @submit.prevent="doSearchByGenre">
-					<div class="blockLabel line">
+					<div class="blockLabel baseLine">
 						<span class="blockLabel-label">{{ t('Type') }}</span>
 						<div class="radioGroup">
 							<label class="radioGroup-label" :class="{isChecked: searchData.genreType == 'FMovies'}">
@@ -1495,13 +1434,13 @@ function afterImport() {
 							</label>
 						</div>
 					</div>
-					<label class="blockLabel line">
+					<label class="blockLabel baseLine">
 						<span class="blockLabel-label">{{ t('Genre') }}</span>
 						<select class="select isFull" v-model="searchData.genre">
 							<option v-for="(option, key) in genresMap" :value="key">{{ option[lang] }}</option>
 						</select>
 					</label>
-					<label class="blockLabel line">
+					<label class="blockLabel baseLine">
 						<span class="blockLabel-label">{{ t('Order') }}</span>
 						<select class="select isFull" v-model="searchData.genreOrder">
 							<option value="rating">{{ t('Rating') }}</option>
@@ -1512,15 +1451,15 @@ function afterImport() {
 							<option value="duration">{{ t('Length') }}</option>
 						</select>
 					</label>
-					<label class="blockLabel line">
+					<label class="blockLabel baseLine">
 						<span class="blockLabel-label">{{ t('Min rating') }}</span>
 						<input class="input isFull" type="number" v-model="searchData.genreRating">
 					</label>
-					<label class="blockLabel line">
+					<label class="blockLabel baseLine">
 						<span class="blockLabel-label">{{ t('Year from') }}</span>
 						<input class="input isFull" type="number" v-model="searchData.genreYear">
 					</label>
-					<div class="blockLabel line">
+					<div class="blockLabel baseLine">
 						<span class="blockLabel-label">{{ t('Dubbed only') }}</span>
 						<div class="radioGroup">
 							<label class="radioGroup-label" :class="{isChecked: searchData.genreDub == '1'}">
@@ -1533,16 +1472,18 @@ function afterImport() {
 							</label>
 						</div>
 					</div>
-					<div class="line">
-						<BButton full icon="fa-solid fa-magnifying-glass" type="submit">{{ t('Search') }}</BButton>
-					</div>
+					<div class="settingsDivider baseLine"></div>
+					<BButton class="baseLine" full icon="fa-solid fa-magnifying-glass" type="submit">{{ t('Search') }}</BButton>
 				</form>
 			</BModal>
 			<BModal v-model:open="showSettingsModal" narrow :title="t('Settings')">
-				<AppSettings :isWindows @afterImport="afterImport" />
+				<AppSettings :isWindows :isAndroid :isIOS @afterImport="afterImport" />
 			</BModal>
 			<BModal v-model:open="showHelpModal" narrow :title="t('Help')">
 				<HelpModalContent />
+			</BModal>
+			<BModal v-model:open="showSyncModal" narrow :title="t('Synchronization')">
+				<SyncModalContent @afterSync="afterImport" />
 			</BModal>
 			<BModal v-if="iOsInstallPrompt" v-model:open="iOsInstallHelper" narrow :title="t('Download App')">
 				<div class="searchCont">

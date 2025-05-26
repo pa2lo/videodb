@@ -7,11 +7,11 @@ const buildTime = __BUILD_TIMESTAMP__;
 <template>
 	<div class="searchCont">
 		<h3>{{ t('Supported video players') }}</h3>
-		<div class="smallerLine preventBoost"><i class="fa-brands fa-android fa-fw"></i> Android - <a href="https://play.google.com/store/apps/details?id=org.videolan.vlc/" target="_blank" rel="noopener noreferrer">VLC</a></div>
-		<div class="preventBoost"><i class="fa-brands fa-apple fa-fw"></i> iOS - <a href="https://apps.apple.com/us/app/vlc-media-player/id650377962/" target="_blank" rel="noopener noreferrer">VLC</a></div>
+		<div class="smallerLine preventBoost"><i class="fa-brands fa-android fa-fw"></i> Android - <a href="https://play.google.com/store/apps/details?id=org.videolan.vlc/" target="_blank" rel="noopener noreferrer">VLC</a> / <a href="https://play.google.com/store/apps/details?id=is.xyz.mpv" target="_blank" rel="noopener noreferrer">MPV</a></div>
+		<div class="preventBoost"><i class="fa-brands fa-apple fa-fw"></i> iOS - <a href="https://apps.apple.com/us/app/vlc-media-player/id650377962/" target="_blank" rel="noopener noreferrer">VLC</a> / <a href="https://apps.apple.com/us/app/nplayer-lite/id1078835991/" target="_blank" rel="noopener noreferrer">NPlayer</a></div>
 		<div class="preventBoost"><i class="fa-brands fa-apple fa-fw"></i> Mac - <a href="https://iina.io/" target="_blank" rel="noopener noreferrer">IINA</a></div>
 		<div class="preventBoost"><i class="fa-brands fa-windows fa-fw"></i> Windows - <a href="https://potplayer.daum.net/" target="_blank" rel="noopener noreferrer">PotPlayer</a> / <a href="https://www.videolan.org/" target="_blank" rel="noopener noreferrer">VLC</a></div>
-		<div class="line">
+		<div class="baseLine">
 			<h3>{{ t('Keyboard shortcuts') }}</h3>
 
 			<h4 class="smallerLine">{{ t('General') }}</h4>
@@ -147,6 +147,6 @@ const buildTime = __BUILD_TIMESTAMP__;
 			</div>
 		</div>
 		<div class="settingsDivider line"></div>
-		<div class="line">Build: {{ buildTime }}</div>
+		<div class="baseLine">Build: {{ buildTime }}</div>
 	</div>
 </template>

@@ -1,6 +1,8 @@
 <?php
 
-header("Access-Control-Allow-Origin: *");
+if ($_SERVER['HTTP_ORIGIN'] == 'http://localhost:5173') {
+	header("Access-Control-Allow-Origin: http://localhost:5173");
+}
 
 // Check if URL is provided via POST
 if (empty($_POST['url'])) {

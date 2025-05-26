@@ -28,3 +28,8 @@ coverage
 *.sw?
 
 *.tsbuildinfo
+
+/public/server/.env.php
+public/server/.env.php
+public/server/proxy-backup.php
+src/backup.js

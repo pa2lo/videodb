@@ -3,14 +3,14 @@ import { ref, onMounted } from 'vue'
 
 import BButton from './BButton.vue'
 
-import { lang, downloadHistory, favs, seriesHistory, moviesHistory, widgetsCache, widgetsMap, currentItemInfo, ignoreMouseEvents } from '@/store'
-import { getProxyData } from '@/helpers'
+import { lang, getQueryParams, downloadHistory, favItems, widgetsMap, currentItemInfo, ignoreMouseEvents } from '@/store'
+import { fixRating, getProxyData } from '@/helpers'
 
 const PLUGIN_URL = import.meta.env.VITE_PLUGIN_URL
+const DEFAULT_POSTER = import.meta.env.VITE_DEFAULT_POSTER
 
 const props = defineProps({
 	id: String,
-	queryParam: String,
 	grid: Boolean,
 	favsFilter: String
 })
@@ -24,45 +24,41 @@ const hasLeftArrow = ref(false)
 const hasRightArrow = ref(false)
 
 onMounted(async () => {
-	if (props.id == 'favs') {
-		content.value = {
-			menu: props.favsFilter ? favs.value.filter(fav => fav.type == props.favsFilter) : JSON.parse(JSON.stringify(favs.value))
-		}
-		return
-	}
+	if (['wm-last', 'ws-last', 'favs'].includes(props.id)) {
+		let list = []
 
-	if (['wm-last', 'ws-last'].includes(props.id)) {
-		content.value = {
-			menu: props.id == 'ws-last' ? JSON.parse(JSON.stringify(seriesHistory.value)) : JSON.parse(JSON.stringify(moviesHistory.value))
-		}
-		return
-	}
+		if (props.id == 'favs') list = props.favsFilter ? favItems.value.filter(fav => fav.type == props.favsFilter).map(f => f.id) : favItems.value.map(f => f.id)
+		if (['wm-last', 'ws-last'].includes(props.id)) list = downloadHistory.value.filter(i => props.id == 'wm-last' ? i.split('/').length == 3 : i.split('/').length != 3).reverse().map(i => i.split('/')[2]).filter((v, i, a) => a.indexOf(v) == i)
 
-	let ts = Date.now()
+		if (!list.length) return
 
-	if (widgetsCache.value[props.id] && (ts - widgetsCache.value[props.id].ts < 1800000)) {
-		content.value = widgetsCache.value[props.id].data
-	} else {
+		if (list.length > 30) list.length = 30
+
 		loading.value = true
 
-		const wMapItem = widgetsMap[props.id]
-		const url = `${PLUGIN_URL}${wMapItem.fetchUrl}${wMapItem.fetchUrl.includes('?') ? '&' : '?'}${props.queryParam}`
-		const page = await getProxyData(url)
+		const page = await getProxyData(`${PLUGIN_URL}/Last?${getQueryParams()}`, null, new URLSearchParams({ids: `[${list}]`}).toString())
 
-		page.menu.length = 30
-
-		page.menu?.map((item, index, arr) => {
-			if (item.info?.rating && item.info.rating > 0 && item.info.rating < 1) item.info.rating = parseFloat((item.info.rating * 10).toFixed(2))
-		})
-
-		widgetsCache.value[props.id] = {
-			data: page,
-			ts
+		if (page.menu?.length) {
+			fixRating(page.menu)
+			content.value = page
 		}
 
 		loading.value = false
-		content.value = page
+		return
 	}
+
+	loading.value = true
+
+	const wMapItem = widgetsMap[props.id]
+	const url = `${PLUGIN_URL}${wMapItem.fetchUrl}${wMapItem.fetchUrl.includes('?') ? '&' : '?'}${getQueryParams()}`
+	const page = await getProxyData(url)
+
+	page.menu.length = 30
+
+	if (page.menu?.length) fixRating(page.menu)
+
+	content.value = page
+	loading.value = false
 })
 
 function onPostersEnter() {
@@ -133,13 +129,14 @@ function getLinkData(link, index) {
 							@itementer="$emit('setCurrentItemInfo', getLinkData(link, linkIndex), true)"
 						>
 							<div class="poster-imgCont">
-								<img v-if="link?.i18n_art?.[lang]?.poster || link?.poster" :src="link?.i18n_art?.[lang]?.poster || link?.poster" class="poster-img" loading="lazy" />
+								<img v-if="(link?.i18n_art?.[lang]?.poster && !link?.i18n_art?.[lang]?.poster?.endsWith('.gif')) || link?.poster" :src="link?.i18n_art?.[lang]?.poster || link?.poster" class="poster-img" loading="lazy" />
+								<img v-else :src="DEFAULT_POSTER" class="poster-img" loading="lazy" />
 								<div v-if="link?.info?.rating" class="movieInfo-rating" :class="{isAverage: link?.info?.rating < 7.5 && link?.info?.rating > 4, isBad: link?.info?.	rating <= 4}">{{ link?.info?.rating }}</div>
 								<BButton class="posterButton-info" icon="fa-solid fa-info" @click.stop="$emit('showCurrentItemInfo')" />
 								<template v-if="!['ws-last', 'wm-last', 'favs'].includes(id) && link?.url">
-									<i v-if="link.id && favs.some(fav => fav.id == link.id)" class="poster-loved fa-solid fa-heart"></i>
-									<i v-if="link?.type == 'video' && downloadHistory.includes(link.url)" class="poster-viewed fa-regular fa-eye"></i>
-									<i v-else-if="link?.type == 'dir' && downloadHistory.some(hitem => hitem.includes(`/Play/${link?.id}/`))" class="poster-viewed fa-regular fa-eye"></i>
+									<i v-if="link.id && favItems.some(fav => fav.id == link.id)" class="poster-loved fa-solid fa-heart"></i>
+									<i v-if="link?.type == 'video' && downloadHistory.includes(link.url)" class="poster-viewed fa-solid fa-check"></i>
+									<i v-else-if="link?.type == 'dir' && downloadHistory.some(hitem => hitem.includes(`/Play/${link?.id}/`))" class="poster-viewed fa-solid fa-check"></i>
 								</template>
 							</div>
 							<div class="poster-text">

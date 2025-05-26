@@ -8,7 +8,7 @@ export function useStorage(key, defaultVal = '', saveIfNotExist = false) {
 	if (!storedVal && defaultVal && saveIfNotExist) localStorage.setItem(key, JSON.stringify(val.value))
 
 	watch(val, () => {
-		if ((val.value === null || val.value == '' || val.value == defaultVal) && val.value !== 0) localStorage.removeItem(key)
+		if ((val.value === null || val.value === '' || val.value == defaultVal) && val.value !== 0) localStorage.removeItem(key)
 		else localStorage.setItem(key, JSON.stringify(val.value))
 	}, { deep: typeof defaultVal == 'object' })
 

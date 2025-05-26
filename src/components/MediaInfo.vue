@@ -5,7 +5,9 @@ import { t } from '@/labels'
 
 import BButton from './BButton.vue'
 
-import { lang, downloadHistory, favs, currentPage, currentItemInfo } from '@/store'
+import { lang, downloadHistory, favItems, currentPage, currentItemInfo } from '@/store'
+
+const DEFAULT_POSTER = import.meta.env.VITE_DEFAULT_POSTER
 
 const props = defineProps({
 	isSupportedOs: Boolean,
@@ -62,16 +64,17 @@ onBeforeUnmount(() => {
 		</div>
 		<div class="movieInfo-topButtons flex ai-c">
 			<slot></slot>
-			<BButton v-if="favs.some(fav => fav.id == currentItemInfo.id)" dark icon="fa-solid fa-heart" :title="t('Remove from favorites')" @click="$emit('toggleFav')" />
+			<BButton v-if="favItems.some(fav => fav.id == currentItemInfo.id)" dark icon="fa-solid fa-heart" :title="t('Remove from favorites')" @click="$emit('toggleFav')" />
 			<BButton v-else dark icon="fa-regular fa-heart" :title="t('Add to favorites')" @click="$emit('toggleFav')" :disabled="isGeneratorSubpage" />
-			<BButton v-if="currentItemInfo.url && downloadHistory.includes(currentItemInfo.url)" dark icon="fa-regular fa-eye-slash" :title="t('Remove from watch list')" @click="$emit('removeFromDownloadHistory', currentItemInfo.url)" />
-			<BButton v-else-if="currentPage?.data?.system?.setContent == 'seasons' && currentItemInfo?.url && downloadHistory.some(hitem => hitem.includes(`/Play/${currentItemInfo?.id}/${currentItemInfo?.info?.season}/`))" dark icon="fa-regular fa-eye-slash" :title="t('Remove from watch list')" disabled />
-			<BButton v-else-if="currentPage?.data?.system?.setContent != 'seasons' && currentItemInfo?.type == 'dir' && currentItemInfo.url && downloadHistory.some(hitem => hitem.includes(`/Play/${currentItemInfo?.id}/`))" dark icon="fa-regular fa-eye-slash" :title="t('Remove from watch list')" disabled />
+			<BButton v-if="currentItemInfo.url && downloadHistory.includes(currentItemInfo.url.split('?')[0])" dark icon="fa-solid fa-check" :title="t('Remove from watch list')" @click="$emit('removeFromDownloadHistory', currentItemInfo.url.split('?')[0])" />
+			<BButton v-else-if="currentPage?.data?.system?.setContent == 'seasons' && currentItemInfo?.url && downloadHistory.some(hitem => hitem.includes(`/Play/${currentItemInfo?.id}/${currentItemInfo?.info?.season}/`))" dark icon="fa-solid fa-check" :title="t('Remove from watch list')" disabled />
+			<BButton v-else-if="currentPage?.data?.system?.setContent != 'seasons' && currentItemInfo?.type == 'dir' && currentItemInfo.url && downloadHistory.some(hitem => hitem.includes(`/Play/${currentItemInfo?.id}/`))" dark icon="fa-solid fa-check" :title="t('Remove from watch list')" disabled />
 			<BButton v-if="showArrows" class="ml-a" dark icon="fa-solid fa-chevron-left" :disabled="currentItemInfo?.isFirst" :title="t('Previous video')" @click="$emit('findNextMedia', false)" />
 			<BButton v-if="showArrows" dark icon="fa-solid fa-chevron-right" :disabled="currentItemInfo?.isLast" :title="t('Next video')" @click="$emit('findNextMedia', true)" />
 		</div>
 		<div class="movieInfo-posterCont">
-			<img v-if="currentItemInfo.i18n_art[lang].poster" :src="currentItemInfo.i18n_art[lang].poster" class="movieInfo-poster" />
+			<img v-if="currentItemInfo.i18n_art[lang]?.poster && !currentItemInfo.i18n_art[lang]?.poster.endsWith('.gif')" :src="currentItemInfo.i18n_art[lang].poster" class="movieInfo-poster" />
+			<img v-else :src="DEFAULT_POSTER" class="movieInfo-poster" />
 			<div v-if="currentItemInfo.info.rating" class="movieInfo-rating" :class="{isAverage: currentItemInfo.info.rating < 7.5 && currentItemInfo.info.rating > 4, isBad: currentItemInfo.info.rating <= 4}">{{ currentItemInfo.info.rating }}</div>
 			<div v-if="currentItemInfo.info.mpaa" class="movieInfo-mpaa">{{ currentItemInfo.info.mpaa }}</div>
 		</div>
