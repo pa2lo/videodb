@@ -36,29 +36,31 @@ onMounted(async () => {
 
 		loading.value = true
 
-		const page = await getProxyData(`${PLUGIN_URL}/Last?${getQueryParams()}`, null, new URLSearchParams({ids: `[${list}]`}).toString())
+		const page = await getProxyData(`${PLUGIN_URL}/Last?${getQueryParams()}`, null, new URLSearchParams({ids: `[${list}]`}).toString(), () => {
+			loading.value = true
+		})
 
-		if (page.menu?.length) {
+		if (page?.menu?.length) {
 			fixRating(page.menu)
 			content.value = page
 		}
 
-		loading.value = false
+		if (loading.value == true) loading.value = false
 		return
 	}
 
-	loading.value = true
-
 	const wMapItem = widgetsMap[props.id]
 	const url = `${PLUGIN_URL}${wMapItem.fetchUrl}${wMapItem.fetchUrl.includes('?') ? '&' : '?'}${getQueryParams()}`
-	const page = await getProxyData(url)
+	const page = await getProxyData(url, null, null, () => {
+		loading.value = true
+	})
 
 	page.menu.length = 30
 
 	if (page.menu?.length) fixRating(page.menu)
 
 	content.value = page
-	loading.value = false
+	if (loading.value == true) loading.value = false
 })
 
 function onPostersEnter() {
@@ -132,9 +134,11 @@ function getLinkData(link, index) {
 								<img v-if="(link?.i18n_art?.[lang]?.poster && !link?.i18n_art?.[lang]?.poster?.endsWith('.gif')) || link?.poster" :src="link?.i18n_art?.[lang]?.poster || link?.poster" class="poster-img" loading="lazy" />
 								<img v-else :src="DEFAULT_POSTER" class="poster-img" loading="lazy" />
 								<div v-if="link?.info?.rating" class="movieInfo-rating" :class="{isAverage: link?.info?.rating < 7.5 && link?.info?.rating > 4, isBad: link?.info?.	rating <= 4}">{{ link?.info?.rating }}</div>
-								<BButton class="posterButton-info" icon="fa-solid fa-info" @click.stop="$emit('showCurrentItemInfo')" />
-								<template v-if="!['ws-last', 'wm-last', 'favs'].includes(id) && link?.url">
+								<BButton class="posterButton-info" icon="fa-solid fa-info" @click.stop="$emit('showCurrentItemInfo', link)" />
+								<template v-if="id != 'favs' && link?.url">
 									<i v-if="link.id && favItems.some(fav => fav.id == link.id)" class="poster-loved fa-solid fa-heart"></i>
+								</template>
+								<template v-if="id == 'favs' && link?.url">
 									<i v-if="link?.type == 'video' && downloadHistory.includes(link.url)" class="poster-viewed fa-solid fa-check"></i>
 									<i v-else-if="link?.type == 'dir' && downloadHistory.some(hitem => hitem.includes(`/Play/${link?.id}/`))" class="poster-viewed fa-solid fa-check"></i>
 								</template>

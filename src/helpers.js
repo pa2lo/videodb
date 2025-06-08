@@ -35,7 +35,7 @@ import { downloadToken, uid } from "./store"
 let requestCache = {}
 const CACHE_LIFETIME = 30 * 60 * 1000
 
-export async function getProxyData(url, abortSignal = null, body = null, force = false) {
+export async function getProxyData(url, abortSignal = null, body = null, loader = null) {
 	let splitURL = url.split('?')
 	let usedKeys = []
 	let newURL = `${splitURL[0]}?${splitURL[1].split('&').sort().filter(i => {
@@ -49,11 +49,11 @@ export async function getProxyData(url, abortSignal = null, body = null, force =
 
 	let cacheKey = body ? url+body.toString() : url
 
-	if (!force && requestCache[cacheKey] && Date.now() - requestCache[cacheKey].ts < CACHE_LIFETIME) {
-		return JSON.parse(JSON.stringify(requestCache[cacheKey].data))
-	}
+	if (requestCache[cacheKey] && Date.now() - requestCache[cacheKey].ts < CACHE_LIFETIME) return JSON.parse(JSON.stringify(requestCache[cacheKey].data))
 
 	try {
+		if (loader) loader()
+
 		const response = await fetch(`${DOWNLOAD_SERVICE_URL}/proxy.php`, {
 			method: 'POST',
 			body: new URLSearchParams(params),

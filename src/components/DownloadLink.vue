@@ -1,7 +1,7 @@
 <script setup>
 import { t } from '@/labels'
 
-import { gCastAvailable } from '@/store'
+import { gCastAvailable, copyLinkButton } from '@/store'
 
 import BButton from './BButton.vue'
 
@@ -25,7 +25,7 @@ defineProps({
 		<div class="downloadModal-linkButtons">
 			<BButton v-if="gCastAvailable" basicIcon smaller icon="fa-brands fa-chromecast" :title="t('Stream video')" @click.stop="$emit('downloadFile', link, false, false, true)" :disabled="loading" />
 			<BButton v-if="isSupportedOs" basicIcon smaller icon="fa-solid fa-download" :title="t('Download')" @click.stop="$emit('downloadFile', link)" :disabled="loading" />
-			<BButton class="copyLink" basicIcon smaller icon="fa-regular fa-copy" :title="t('Copy link')" @click.stop="$emit('copyFileLink', link)" :disabled="loading" />
+			<BButton v-if="copyLinkButton" class="copyLink" basicIcon smaller icon="fa-regular fa-copy" :title="t('Copy link')" @click.stop="$emit('copyFileLink', link)" :disabled="loading" />
 			<BButton v-if="isDesktopOs" basicIcon smaller icon="fa-solid fa-plus" :title="t('Add to playlist')" @click.stop="$emit('downloadFile', link, true, true)" :disabled="loading" />
 		</div>
 	</div>

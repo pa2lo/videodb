@@ -26,11 +26,12 @@ The **Screenshots** folder contains previews of the UI.
 ## ToDo
 - refactoring
 
-## Update 05/25
+## Update 05-06/25
 - updated search
 - updated scripts for fetching data and login
 - new supported players (iOS, Android)
+- updated UI + new layouts for movies/seasons/episodes page
 - added Sync function (synchronize watched, favorites, bookmarks), QR code generator and scanner for easier setup
 - added PHP scripts (proxy for fetching data, link shortener, sync...)
 - support for casting links to Chromecast (disabled due to file format)
-- bugfixes
+- bugfixes + optimizations

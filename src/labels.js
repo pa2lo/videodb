@@ -52,6 +52,8 @@ const labels = {
 		"Newest streams": "Najnovšie streamy",
 		"Min rating": "Najnižšie hodnotenie",
 		"Year from": "Od roku",
+		"Collapse menu": "Zbaliť menu",
+		"Expand menu": "Rozbaliť menu",
 
 		// toasts
 		"Video removed from favorites": "Video odobrané z obľúbených",
@@ -68,6 +70,11 @@ const labels = {
 		"Video removed from watch list": "Video odobrané zo zoznamu videných",
 
 		// settings
+		"Layout": "Rozloženie",
+		"List left": "Zoznam vľavo",
+		"List right": "Zoznam vpravo",
+		"Grid": "Mriežka",
+		"Grid with info": "Mriežka s informáciami",
 		"List sort": "Zoradenie zoznamu",
 		"Default": "Predvolené",
 		"Rating": "Hodnotenie",
@@ -87,6 +94,8 @@ const labels = {
 		"Dubbing only": "Iba dabované",
 		"Include HDR": "Vrátane HDR",
 		"Include Dolby Vision": "Vrátane Dolby Vision",
+		"Show copy link button": "Zobraziť tlačidlo na kopírovanie odkazu",
+		"Show 'Back' item": "Zobraziť položku 'Späť'",
 		"Yes": "Áno",
 		"No": "Nie",
 		"Random episode - stream quality": "Náhodná epizóda - kvalita streamu",
@@ -209,6 +218,8 @@ const labels = {
 		"Newest streams": "Nejnovější streamy",
 		"Min rating": "Nejnižší hodnocení",
 		"Year from": "Od roku",
+		"Collapse menu": "Sbalit menu",
+		"Expand menu": "Rozbalit menu",
 
 		// toasts
 		"Video removed from favorites": "Video odebráno z oblíbených",
@@ -225,6 +236,11 @@ const labels = {
 		"Video removed from watch list": "Video odebrané ze seznamu viděných",
 
 		// settings
+		"Layout": "Rozložení",
+		"List left": "Seznam vlevo",
+		"List right": "Seznam vpravo",
+		"Grid": "Mřížka",
+		"Grid with info": "Mřížka s informacemi",
 		"List sort": "Seřazení seznamu",
 		"Default": "Výchozí",
 		"Rating": "Hodnocení",
@@ -244,6 +260,8 @@ const labels = {
 		"Dubbing only": "Pouze dabované",
 		"Include HDR": "Včetně HDR",
 		"Include Dolby Vision": "Včetně Dolby Vision",
+		"Show copy link button": "Zobrazit tlačítko na kopírování odkazu",
+		"Show 'Back' item": "Zobrazit položku 'Zpět'",
 		"Yes": "Ano",
 		"No": "Ne",
 		"Random episode - stream quality": "Náhodná epizoda - kvalita streamu",

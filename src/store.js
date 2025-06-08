@@ -12,12 +12,15 @@ export const tokenDate = useStorage('tokenDate', null)
 export const uid = useStorage('uid', `9802BF2F-C445-552D-A3EE-${Date.now()}`, true)
 export const downloadHistory = useStorage('downloadHistory', [])
 export const favItems = useStorage('favItems', [])
-export const generatorShows = useStorage('generatorShows', ["4158", "3757", "14264", "3670", "7410", "4245", "3844", "3903", '11518', '14601', '9719', '3824', '3744', '14362'])
+export const generatorShows = useStorage('generatorShows', ["4158", "3757", "14264", "3670", "7410", "4245", "3844", "68191", '11518', '14601', '9719', '3824', '14362'])
+export const videoLayout = useStorage('videoLayout', 'listLeft')
 export const generatorQuality = useStorage('generatorQuality', 'medium')
 export const generatorShowsHistory = useStorage('generatorShowsHistory', [])
 export const bookmarks = useStorage('bookmarks', [])
 export const theme = useStorage('theme', '')
-export const hpWidgets = useStorage('hpWidgets', ["wm-01","ws-01","ws-last","favs"])
+export const showBackItem = useStorage('showBackItem', 0)
+export const copyLinkButton = useStorage('copyLinkButton', 0)
+export const hpWidgets = useStorage('hpWidgets', ["menu","wm-01","ws-01","ws-last","favs"])
 export const winPlayer = useStorage('winPlayer', 'pot')
 export const androidPlayer = useStorage('androidPlayer', 'mpv')
 export const iosPlayer = useStorage('iosPlayer', 'vlc')
@@ -51,6 +54,13 @@ export function getQueryParams() {
 
 // maps
 export const widgetsMap = {
+	'menu': {
+		sectionTitle: {
+			sk: 'Menu',
+			cs: 'Menu',
+			en: 'Menu'
+		}
+	},
 	'wm-01': {
 		sectionTitle: {
 			sk: 'Filmy - novinky',
@@ -135,12 +145,12 @@ export const showsMap = {
 	'7410': 'Red Dwarf',
 	'4245': 'IT Crowd',
 	'3844': 'South Park',
-	'3903': 'Big Bang Theory',
+	'68191': 'Big Bang Theory',
 	'11518': '2 Broke Girls',
 	'14601': 'American Dad',
 	'9719': 'Brickleberry',
 	'3824': 'How I Met Your Mother',
-	'3744': 'Comeback',
+	// '3744': 'Comeback',
 	'14362': 'Rick and Morty'
 }
 export const searchIdMap = {
@@ -321,7 +331,8 @@ export const homepageLinks = {
 				"en": {"title": "Movies"},
 				"cs": {"title": "Filmy"},
 				"sk": {"title": "Filmy"}
-			}
+			},
+			"icon": "fa-solid fa-film"
 		},
 		{
 			"type": "dir",
@@ -331,7 +342,8 @@ export const homepageLinks = {
 				"en": {"title": "Series"},
 				"cs": {"title": "Seriály"},
 				"sk": {"title": "Seriály"}
-			}
+			},
+			"icon": "fa-solid fa-tv"
 		},
 		{
 			"type": "dir",
@@ -341,7 +353,8 @@ export const homepageLinks = {
 				"en": {"title": "Concerts"},
 				"cs": {"title": "Koncerty"},
 				"sk": {"title": "Koncerty"}
-			}
+			},
+			"icon": "fa-solid fa-guitar"
 		},
 		{
 			"type": "dir",
@@ -351,7 +364,8 @@ export const homepageLinks = {
 				"en": {"title": "Documentary"},
 				"cs": {"title": "Dokumentární"},
 				"sk": {"title": "Dokumentárne"}
-			}
+			},
+			"icon": "fa-solid fa-mountain-sun"
 		},
 		{
 			"type": "dir",
@@ -361,18 +375,20 @@ export const homepageLinks = {
 				"en": {"title": "Anime"},
 				"cs": {"title": "Anime"},
 				"sk": {"title": "Anime"}
-			}
+			},
+			"icon": "fa-solid fa-dragon"
 		},
-		{
-			"type": "dir",
-			"url": "/FSport",
-			"id": "sport",
-			"i18n_info": {
-				"en": {"title": "Sport"},
-				"cs": {"title": "Sport"},
-				"sk": {"title": "Šport"}
-			}
-		},
+		// {
+		// 	"type": "dir",
+		// 	"url": "/FSport",
+		// 	"id": "sport",
+		// 	"i18n_info": {
+		// 		"en": {"title": "Sport"},
+		// 		"cs": {"title": "Sport"},
+		// 		"sk": {"title": "Šport"}
+		// 	},
+		// 	"icon": "fa-solid fa-volleyball"
+		// },
 		{
 			"type": "dir",
 			"url": "/Search/getList",
@@ -380,7 +396,8 @@ export const homepageLinks = {
 				"en": {"title": "Lists / Charts"},
 				"cs": {"title": "Seznamy / Řebríčky"},
 				"sk": {"title": "Zoznamy / Rebríčky"}
-			}
+			},
+			"icon": "fa-solid fa-list-ul"
 		},
 		{
 			"type": "dir",
@@ -390,7 +407,8 @@ export const homepageLinks = {
 				"en": {"title": "Random episode"},
 				"cs": {"title": "Náhodná epizóda"},
 				"sk": {"title": "Náhodná epizoda"}
-			}
+			},
+			"icon": "fa-solid fa-shuffle"
 		}
 	],
 	"system": {

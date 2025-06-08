@@ -13,15 +13,17 @@ import AppSettings from './components/AppSettings.vue'
 import DownloadLink from './components/DownloadLink.vue'
 import SyncModalContent from './components/SyncModalContent.vue'
 
-import { lang, listsort, streamsLang, token, downloadToken, tokenDate, uid, downloadHistory, favItems, generatorShows, generatorQuality, generatorShowsHistory, bookmarks, theme, hpWidgets, winPlayer, androidPlayer, iosPlayer, widgetsMap, currentPage, currentItemInfo, toasts, showToast, destroyToast, showsMap, searchIdMap, genresMap, homepageLinks, moviesAdditionalLinks, ignoreMouseEvents, getQueryParams, syncKey, syncError, syncing, gCastAvailable, gCastConnected } from './store'
+import { lang, listsort, streamsLang, token, downloadToken, tokenDate, uid, downloadHistory, favItems, generatorShows, generatorQuality, generatorShowsHistory, bookmarks, theme, videoLayout, hpWidgets, winPlayer, androidPlayer, iosPlayer, widgetsMap, currentPage, currentItemInfo, toasts, showToast, destroyToast, showsMap, searchIdMap, genresMap, homepageLinks, moviesAdditionalLinks, ignoreMouseEvents, getQueryParams, syncKey, syncError, syncing, gCastConnected, showBackItem } from './store'
 import { getProxyData, abortSignalAny } from './helpers'
 import { sync } from './sync'
 import { gCast } from './gCast'
+import MenuLink from './components/MenuLink.vue'
 
 const PLUGIN_URL = import.meta.env.VITE_PLUGIN_URL
 const SERVICE_URL = import.meta.env.VITE_SERVICE_URL
 const SITE_URL = import.meta.env.VITE_SITE_URL
 const DOWNLOAD_SERVICE_URL = import.meta.env.VITE_DOWNLOAD_SERVICE_URL
+const DEFAULT_POSTER = import.meta.env.VITE_DEFAULT_POSTER
 
 // OS
 const isMac = navigator?.platform == 'MacIntel' && navigator.maxTouchPoints < 2
@@ -47,7 +49,8 @@ const appState = shallowReactive({
 	krPass: '',
 	krRemember: false,
 	videoUrl: '',
-	autoLogin: false
+	autoLogin: false,
+	menuOpened: false
 })
 
 const downloadStreams = shallowReactive({
@@ -103,6 +106,7 @@ const showInfoModal = ref(false)
 const showHelpModal = ref(false)
 const showCurrentSortModal = ref(false)
 const showSyncModal = ref(false)
+const showLayoutSelectModal = ref(false)
 
 // install
 const installPromptCancelled = ref(localStorage.getItem('installClosed'))
@@ -157,10 +161,6 @@ function onPopState(e) {
 }
 
 // sort
-function setCurrentSortBy(by) {
-	currentPage.value.sortBy = by
-	showCurrentSortModal.value = false
-}
 const sortFunctions = {
 	rating: (a, b) => (b?.info?.rating ?? 0) - (a?.info?.rating ?? 0),
 	newest: (a, b) => (b?.info?.year ?? 0) - (a?.info?.year ?? 0),
@@ -168,18 +168,21 @@ const sortFunctions = {
 	longest: (a, b) => (b?.info?.duration ?? 0) - (a?.info?.duration ?? 0),
 	shortest: (a, b) => (a?.info?.duration ?? Number.MAX_SAFE_INTEGER) - (b?.info?.duration ?? Number.MAX_SAFE_INTEGER)
 }
-const sortedList = computed(() => {
-	let items = currentPage.value?.data?.menu || []
-
+function sortList(menuItems = [], page) {
 	const sortBy = currentPage.value?.sortBy || listsort.value
-	if (sortBy && sortFunctions[sortBy]) items = items.toSorted(sortFunctions[sortBy])
+	let items = ['movies', 'tvshows'].includes(page?.system?.setContent) && sortBy && sortFunctions[sortBy] ? menuItems.toSorted(sortFunctions[sortBy]) : JSON.parse(JSON.stringify(menuItems))
 
 	return items.map((item, index, arr) => {
 		if (index === 0) item.isFirst = true
 		if ((index === arr.length - 1 && item?.type !== 'next') || (index === arr.length - 2 && arr[index + 1]?.type === 'next')) item.isLast = true
 		return item
 	})
-})
+}
+function setCurrentSortBy(by) {
+	currentPage.value.sortBy = by
+	if (currentPage.value.data?.menu?.length) currentPage.value.data.sortedMenu = sortList(currentPage.value.data.menu, currentPage.value.data)
+	showCurrentSortModal.value = false
+}
 
 // bookmarks
 const isInBookmarks = computed(() => {
@@ -344,10 +347,14 @@ async function getUrlContent(url, customUrl) {
 
 		if (page.system?.setContent === 'movies') page.menu = page.menu.filter((item, index, arr) => arr.findIndex(x => (x.id || x.url) === (item.id || item.url)) === index)
 
+		page.menu = page.menu.filter(l => !['nextep', 'last'].includes(l.action))
+
+		page.sortedMenu = sortList(page.menu, page)
+
 		if (url == '/FMovies') page?.menu?.push(...moviesAdditionalLinks)
 	}
 
-	currentItemInfo.value = null
+	currentItemInfo.value = page.sortedMenu?.[0] ?? null
 
 	return page
 }
@@ -583,7 +590,7 @@ function doSearch(title, newUrl) {
 function showGeneratorPage() {
 	currentItemInfo.value = null
 	currentPage.value = {
-		type: 'geneartor',
+		type: 'generator',
 		id: 'generator',
 		title: reduceStringByLangs('Random episode', '')
 	}
@@ -609,12 +616,19 @@ async function getRandomShowsEpisode(ignoreHistory) {
 		episode = episodesFetchData.menu[Math.floor(Math.random() * episodesFetchData.menu.length)]
 	} catch (error) {
 		showToast(t('Error loading data'))
+		generatorShowsData.loading = false
 	}
 
 	if (generatorShowsHistory.value.some(hitem => hitem.epUrl == episode.url)) return getRandomShowsEpisode(true)
 
+	generatorShowsData.show = showId
+	generatorShowsData.epname = `${String(episode?.info?.season || 0).padStart(2, 0)}x${String(episode?.info?.episode).padStart(2, 0)} - ${episode?.i18n_info[lang.value]?.epname}`
+	generatorShowsData.epUrl = episode.url
+	generatorShowsData.loading = false
+}
+async function getEpisodeDownloadLink(url) {
 	try {
-		const streamsFetchData = await getProxyData(`${PLUGIN_URL}/${episode.url}?${getQueryParams()}`)
+		const streamsFetchData = await getProxyData(`${PLUGIN_URL}/${url}?${getQueryParams()}`)
 		streamsFetchData.strms.map(stream => {
 			stream.size = stream.size.includes('GB') ? parseFloat(stream.size)*1000 : parseFloat(stream.size)
 		})
@@ -626,19 +640,19 @@ async function getRandomShowsEpisode(ignoreHistory) {
 			medium: streamsFetchData.strms.some(strm => strm.size < 950 && strm.size > 400) ? streamsFetchData.strms.filter(strm => strm.size > 400)[0].url : streamsFetchData.strms[0].url
 		}
 
-		generatorShowsData.show = showId
-		generatorShowsData.epname = `${String(episode?.info?.season || 0).padStart(2, 0)}x${String(episode?.info?.episode).padStart(2, 0)} - ${episode?.i18n_info[lang.value]?.epname}`
-		generatorShowsData.epUrl = episode.url
-		generatorShowsData.url = stream
+		return stream[generatorQuality.value]
 	} catch (error) {
 		showToast(t('Error loading data'))
 	}
-
-	generatorShowsData.loading = false
 }
-function generatorDownloadFile(link, playLink = false, enqueue = false) {
+async function generatorCopyFileLink(link) {
+	const url = await getEpisodeDownloadLink(link.epUrl)
+	return copyFileLink({url})
+}
+async function generatorDownloadFile(link, playLink = false, enqueue = false) {
 	downloadStreams.link = link.epUrl
-	downloadFile({url: link.url[generatorQuality.value]}, playLink, enqueue)
+	const url = await getEpisodeDownloadLink(link.epUrl)
+	downloadFile({url}, playLink, enqueue)
 	pushGeneratorHistoryItem(link)
 }
 function pushGeneratorHistoryItem(link) {
@@ -646,8 +660,7 @@ function pushGeneratorHistoryItem(link) {
 	generatorShowsHistory.value.unshift({
 		show: JSON.parse(JSON.stringify(link.show)),
 		epname: JSON.parse(JSON.stringify(link.epname)),
-		epUrl: JSON.parse(JSON.stringify(link.epUrl)),
-		url: JSON.parse(JSON.stringify(link.url))
+		epUrl: JSON.parse(JSON.stringify(link.epUrl))
 	})
 	generatorShowsHistory.value.splice(20, 5)
 }
@@ -661,9 +674,9 @@ function afterListEnter() {
 	ignoreMouseEnter = false
 	mainEl.value?.focus()
 }
-function findNextMedia(right, updateDownloadWindow) {
+function findNextMedia(right, updateDownloadWindow, allowSystemLinks) {
 	let currentEl = getCurrentFocusableItem()
-	if (!currentEl || (right && currentItemInfo.value?.isLast) || (!right && currentItemInfo.value?.isFirst)) return
+	if (!currentEl || (right && currentItemInfo.value?.isLast && !allowSystemLinks) || (!right && currentItemInfo.value?.isFirst && !allowSystemLinks)) return
 
 	let next = right ? currentEl.nextElementSibling : currentEl.previousElementSibling
 	if (next) {
@@ -680,7 +693,21 @@ function findNextFocusableItem(down, num = 1, limit = false) {
 	let focusableEls = Array.from(mainEl.value.querySelectorAll('.isFocusable'))
 	if (!focusableEls.length) return
 
+	let currentItem = focusableEls.find(el => el.classList.contains('isCurrent'))
 	let currentIndex = focusableEls.findIndex(el => el.classList.contains('isCurrent'))
+
+	if (currentItem && ['.dirLink', '.postersGrid .poster'].some(i => currentItem.matches(i)) && num == 1 && ((!down && currentIndex > 0) || (down && currentIndex + 1 < focusableEls.length))) {
+		num = parseInt(currentItem.parentNode.clientWidth / currentItem.clientWidth)
+		let nextLREl
+		if (down) nextLREl = focusableEls.findIndex((e, i) => (e.classList.contains('posters-cont') || e.matches('.dirLinks > .dirLink:first-child')) && i > currentIndex)
+		else nextLREl = focusableEls.findLastIndex((e, i) => e.classList.contains('posters-cont') && i < currentIndex)
+		if (nextLREl > 0) {
+			if (down && currentIndex + num > nextLREl) num = nextLREl - currentIndex
+			else if (!down && currentIndex - num < nextLREl) num = currentIndex - nextLREl
+		} else if (down && currentIndex + num > focusableEls.length) num = focusableEls.length - 1 - currentIndex
+		else if (!down && currentIndex > 0 && currentIndex - num < -1) num = currentIndex
+	}
+
 	let nextIndex = down ?
 		limit ? Math.min(currentIndex + num, focusableEls.length - 1) : (currentIndex + num) % focusableEls.length :
 		limit ? Math.max(currentIndex - num, 0) : (Math.max(currentIndex, 0) - num + focusableEls.length) % focusableEls.length
@@ -897,9 +924,28 @@ function setCurrentItemInfo(link, scrollToItem) {
 		})
 	}
 }
-function showCurrentItemInfo() {
+function showCurrentItemInfo(link) {
 	if (['next', 'back'].includes(currentItemInfo.value?.type) || !currentItemInfo.value?.info || showInfoModal.value || !currentItemInfo.value?.i18n_art || ignoreMouseEnter) return
+	if (link && link.url != currentItemInfo.value.url) setCurrentItemInfo(link)
 	showInfoModal.value = true
+}
+
+// info grid layout functions
+let gridMouseEnterTimeout = null
+function onMouseLeaveGrid(e) {
+	if (gridMouseEnterTimeout) clearTimeout(gridMouseEnterTimeout)
+	e.target.classList.remove('loadingInfo')
+}
+function setCurrentItemInfoGrid(e, link) {
+	if (videoLayout.value == 'infoGrid' && e.pointerType == 'mouse') {
+		if (gridMouseEnterTimeout) clearTimeout(gridMouseEnterTimeout)
+		if (e.target.classList.contains('isCurrent')) return
+		gridMouseEnterTimeout = setTimeout(() => {
+			if (!document.documentElement.contains(e.target)) return
+			setCurrentItemInfo(link)
+		}, 1500)
+		e.target.classList.add('loadingInfo')
+	} else setCurrentItemInfo(link)
 }
 
 // helpers
@@ -915,6 +961,12 @@ function runUpdater() {
 	if (localStorage.getItem('onlyDub')) {
 		streamsLang.value = 0
 		localStorage.removeItem('onlyDub')
+	}
+
+	// Update 06/25
+	if (generatorShows.value && ["3744", "3903"].some(id => generatorShows.value.includes(id))) {
+		if (generatorShows.value.includes("3903")) generatorShows.value.push("68191")
+		generatorShows.value = generatorShows.value.filter(id => !["3744", "3903"].includes(id))
 	}
 }
 function getCurrentFocusableItem() {
@@ -1011,11 +1063,11 @@ function onInfoKeydown(e) {
 }
 function onMainKeydown(e) {
 	if (e.code == 'Escape' && currentHistoryIndex.value > -1) windowHistory.go(-currentHistoryIndex.value)
-	else if (currentPage?.value?.type == 'geneartor') {
+	else if (currentPage?.value?.type == 'generator') {
 		if (e.code == 'KeyD') generatorDownloadFile(generatorShowsData)
 		else if (e.code == 'KeyP' && !e.metaKey && !e.ctrlKey && isSupportedOs) generatorDownloadFile(generatorShowsData, true)
 		else if (e.code == 'KeyQ' && isDesktopOs) generatorDownloadFile(generatorShowsData, true, true)
-		else if (e.code == 'KeyC' && !e.metaKey && !e.ctrlKey && isDesktopOs) copyFileLink({url: generatorShowsData.url[generatorQuality.value]})
+		else if (e.code == 'KeyC' && !e.metaKey && !e.ctrlKey && isDesktopOs) generatorCopyFileLink(generatorShowsData)
 		else if (e.code == 'KeyF') getRandomShowsEpisode(false)
 		else if (e.key == 'Enter') getRandomShowsEpisode(false)
 	} else {
@@ -1027,7 +1079,7 @@ function onMainKeydown(e) {
 		else if (e.code == 'KeyF') toggleFav()
 		else if (e.key == 'Enter') mainCurrentClick()
 		else if (e.code == 'ArrowDown' || e.code == 'ArrowUp') findNextFocusableItem(e.code == 'ArrowDown')
-		else if (e.code == 'ArrowRight' || e.code == 'ArrowLeft') findNextMedia(e.code == 'ArrowRight')
+		else if (e.code == 'ArrowRight' || e.code == 'ArrowLeft') findNextMedia(e.code == 'ArrowRight', false, true)
 		else if (e.code == 'PageDown' || e.code == 'PageUp') findNextFocusableItem(e.code == 'PageDown', 10, true)
 		else if (e.code == 'Home' || e.code == 'End') findEndFocusableItem(e.code == 'Home')
 	}
@@ -1071,26 +1123,35 @@ function afterImport() {
 
 <template>
 	<Transition appear name="layout" mode="out-in" @afterEnter="onInterfaceEnter">
-		<div v-if="token" class="layout" @keydown="startIgnoringEvents" @mousemove="ignoreMouseEvents && (ignoreMouseEvents = false)">
+		<div v-if="token" class="layout" :class="appState.menuOpened ? 'menuOpened' : 'menuClosed'" @keydown="startIgnoringEvents" @mousemove="ignoreMouseEvents && (ignoreMouseEvents = false)">
+			<div class="menu-backdrop" @click.self="appState.menuOpened = false"></div>
+			<aside class="menu">
+				<a class="logo-link flex ai-c" href="/" @click.prevent="currentHistoryIndex > 0 ? windowHistory.go(-currentHistoryIndex) : getHomePage(true)">
+					<span class="logo">
+						<svg viewBox="0 0 36 36" xmlns="http://www.w3.org/2000/svg" version="1.1" fill="#2ebc4f"><path d="M 0 18 C 0 0, 0 0, 18 0 S 36 0, 36 18, 36 36 18 36, 0 36, 0 18" transform="rotate(0, 18, 18) translate(0, 0)"></path></svg>
+						<i class="fa-solid fa-circle-play"></i>
+					</span>
+					<span class="logo-text menuLink-text">VideoDB</span>
+				</a>
+				<div class="menu-items">
+					<MenuLink href="/" icon="fa-solid fa-home" :title="t('Home')" :isActive="currentPage?.type == 'home'" @click.prevent="currentHistoryIndex > 0 ? windowHistory.go(-currentHistoryIndex) : getHomePage(true)" />
+					<MenuLink icon="fa-solid fa-search" :title="t('Search')" @click.prevent="showSearch" />
+					<MenuLink v-for="link in homepageLinks['menu']" :icon="link.icon" :title="link.i18n_info[lang].title" :isActive="(link.action && currentPage?.type == link.action) || (link.url && currentPage?.url?.startsWith(link.url))" @click.prevent="visitLinkFromHome(link)" />
+				</div>
+				<div class="menu-items">
+					<MenuLink v-if="installPrompt || iOsInstallPrompt" icon="fa-solid fa-cloud-arrow-down" :title="t('Download App')" @click.prevent="installApp" />
+					<MenuLink :class="{isSorted: syncKey && !syncError, isError: syncKey && syncError}" :icon="`fa-solid fa-arrows-rotate ${syncing ? 'fa-spin' : ''}`" :title="t('Synchronization')" @click.prevent="showSyncModal = true" />
+					<MenuLink icon="fa-solid fa-gear" :title="t('Settings')" @click.prevent="showSettingsModal = true" />
+					<MenuLink icon="fa-solid fa-question" :title="t('Help')" @click.prevent="showHelpModal = true" />
+					<MenuLink icon="fa-solid fa-right-from-bracket" :title="t('Logout')" @click.prevent="logout" />
+				</div>
+			</aside>
 			<header class="flex ai-c header" :tabindex="isIOS ? '-1' : null">
-				<a class="logo" href="/" @click.prevent="currentHistoryIndex > 0 ? windowHistory.go(-currentHistoryIndex) : getHomePage(true)">
+				<a class="logo logo-desktop" href="/" @click.prevent="currentHistoryIndex > 0 ? windowHistory.go(-currentHistoryIndex) : getHomePage(true)">
 					<svg viewBox="0 0 36 36" xmlns="http://www.w3.org/2000/svg" version="1.1" fill="#2ebc4f"><path d="M 0 18 C 0 0, 0 0, 18 0 S 36 0, 36 18, 36 36 18 36, 0 36, 0 18" transform="rotate(0, 18, 18) translate(0, 0)"></path></svg>
 					<i class="fa-solid fa-circle-play"></i>
 				</a>
-				<div class="desktopNav flex">
-					<div class="desktopNav-link" :class="{isActive: currentPage?.url?.startsWith('/FMovies') || currentPage?.data?.system?.setContent == 'movies'}" @click.prevent="visitLinkFromHome(homepageLinks.menu[0])">
-						<i class="fa-solid fa-video desktopNav-icon"></i>
-						<div class="desktopNav-title">{{ t('Movies') }}</div>
-					</div>
-					<div class="desktopNav-link" :class="{isActive: !isGeneratorSubpage && (currentPage?.url?.startsWith('/FSeries') || ['seasons', 'episodes', 'tvshows'].includes(currentPage?.data?.system?.setContent))}" @click.prevent="visitLinkFromHome(homepageLinks.menu[1])">
-						<i class="fa-solid fa-tv desktopNav-icon"></i>
-						<div class="desktopNav-title">{{ t('Series') }}</div>
-					</div>
-					<div class="desktopNav-link" :class="{isActive: isGeneratorSubpage}" @click.prevent="visitLinkFromHome({action: 'generator'})">
-						<i class="fa-solid fa-shuffle desktopNav-icon"></i>
-						<div class="desktopNav-title">{{ t('Random') }}</div>
-					</div>
-				</div>
+				<BButton dark smaller icon="fa-solid fa-bars" class="buttonUnstyled collapseMenu-toggle" @click.prevent="appState.menuOpened = !appState.menuOpened"  :title="t(appState.menuOpened ? 'Collapse menu' : 'Expand menu')" />
 				<div class="pageTitle flex ai-c">
 					<BButton dark smaller icon="fa-solid fa-angle-left" class="buttonUnstyled" :disabled="currentPage?.type == 'home'" @click.prevent="windowHistory.go(-1)" :title="t('Back')" />
 					<Transition name="layout" mode="out-in">
@@ -1109,7 +1170,7 @@ function afterImport() {
 							<div class="pageTitle-text" v-html="reformatString(currentPage?.title?.[lang] || '')"></div>
 							<div v-if="['movies', 'tvshows'].includes(currentPage?.data?.system?.setContent)" class="pageTitle-info">
 								<template v-if="currentPage?.data?.filter?.meta?.total_found">{{ getFilterFromTo() }}</template>
-								<template v-else-if="sortedList.length">{{ sortedList.length }}</template>
+								<template v-else-if="currentPage.data.menu.length">{{ currentPage.data.menu.length }}</template>
 							</div>
 							<div v-else-if="['episodes', 'seasons'].includes(currentPage?.data?.system?.setContent) && currentPage?.data?.filter && currentPage?.data?.filter?.meta?.total_found" class="pageTitle-info">{{ currentPage.data.filter.meta.total_found }}</div>
 						</div>
@@ -1119,15 +1180,12 @@ function afterImport() {
 					<BButton dark smaller icon="fa-solid fa-ellipsis-vertical" class="header-more buttonUnstyled" :title="t('Menu')" @click="$event.target.closest('button')?.focus()" @focus="null" />
 					<div class="header-buttons flex ai-c">
 						<BButton dark smaller class="buttonUnstyled" :class="{isSorted: currentPage?.sortBy}" icon="fa-solid fa-arrow-down-short-wide" :disabled="!['movies', 'tvshows'].includes(currentPage?.data?.system?.setContent)" @click.prevent="showCurrentSortModal = true" :title="t('List sort')" />
+						<BButton dark smaller class="buttonUnstyled" icon="fa-solid fa-table-cells" @click.prevent="showLayoutSelectModal = true" :title="t('Layout')" :disabled="!['movies', 'tvshows', 'episodes', 'seasons'].includes(currentPage?.data?.system?.setContent)" />
 						<BButton dark smaller class="buttonUnstyled" :icon="isInBookmarks ? 'fa-solid fa-bookmark' : 'fa-regular fa-bookmark'" :disabled="!currentPage?.url" @click.prevent="toggleBookmark" :title="isInBookmarks ? t('Remove from bookmarks') : t('Add to bookmarks')" />
-						<!-- <BButton dark smaller class="buttonUnstyled" icon="fa-solid fa-rotate-right" @click.prevent="refreshPage" :title="t('Refresh page')" /> -->
+						<BButton dark smaller class="buttonUnstyled" icon="fa-solid fa-rotate-right" @click.prevent="refreshPage" :title="t('Refresh page')" />
 						<BButton dark smaller class="buttonUnstyled" icon="fa-solid fa-search" :title="t('Search')" @click="showSearch" />
 						<BButton v-if="gCastConnected" dark smaller class="buttonUnstyled isSorted" icon="fa-brands fa-chromecast" :title="t('Disconnect device')" @click="disconnectGCast" />
 						<BButton v-if="installPrompt || iOsInstallPrompt" class="buttonUnstyled" dark smaller icon="fa-solid fa-cloud-arrow-down" :title="t('Download App')" @click.prevent="installApp" />
-						<BButton dark smaller class="buttonUnstyled" :class="{isSorted: syncKey && !syncError, isError: syncKey && syncError}" :icon="`fa-solid fa-arrows-rotate ${syncing ? 'fa-spin' : ''}`" :title="t('Synchronization')" @click.prevent="showSyncModal = true" />
-						<BButton dark smaller class="buttonUnstyled" icon="fa-solid fa-gear" :title="t('Settings')" @click.prevent="showSettingsModal = true" />
-						<BButton dark smaller class="buttonUnstyled" icon="fa-solid fa-question" :title="t('Help')" @click.prevent="showHelpModal = true" />
-						<BButton dark smaller class="buttonUnstyled" icon="fa-solid fa-right-from-bracket" :title="t('Logout')" @click.prevent="logout" />
 					</div>
 				</div>
 			</header>
@@ -1137,8 +1195,8 @@ function afterImport() {
 						<i class="fa-solid fa-spinner fa-spin-pulse fa-5x"></i>
 					</div>
 					<div v-else-if="currentPage?.data?.system?.setContent == 'files'" class="dirPage scroller" :key="currentPage.id">
-						<div class="dirLinks">
-							<div v-if="currentPage?.type != 'home'" class="dirLink isFocusable" :class="{isCurrent: currentItemInfo && currentItemInfo.type == 'back'}" @click.prevent="windowHistory.go(-1)" @pointerenter="!ignoreMouseEvents && setCurrentItemInfo({type: 'back'})" @itementer="setCurrentItemInfo({type: 'back'}, true)">
+						<div v-if="currentPage?.type != 'home' || hpWidgets.includes('menu')" class="dirLinks">
+							<div v-if="currentPage?.type != 'home' && showBackItem" class="dirLink isFocusable" :class="{isCurrent: currentItemInfo && currentItemInfo.type == 'back'}" @click.prevent="windowHistory.go(-1)" @pointerenter="!ignoreMouseEvents && setCurrentItemInfo({type: 'back'})" @itementer="setCurrentItemInfo({type: 'back'}, true)">
 								<div class="dirLink-title"><i class="fa-solid fa-angle-left fa-fw"></i> {{ t('Back') }}</div>
 							</div>
 							<template v-for="link in currentPage?.data.menu">
@@ -1154,20 +1212,18 @@ function afterImport() {
 								</div>
 							</template>
 						</div>
-						<div v-if="currentPage?.type == 'home' && hpWidgets.length" class="homeWidgets">
-							<template v-for="(val, key) in widgetsMap">
-								<HomeWidget
-									v-if="hpWidgets.includes(key)"
-									:id="key"
-									@showDownload="showDownload"
-									@setCurrentItemInfo="setCurrentItemInfo"
-									@removeFromDownloadHistory="removeFromDownloadHistory"
-									@visitLink="visitLink"
-									@showCurrentItemInfo="showCurrentItemInfo"
-								/>
-							</template>
-						</div>
-						<div v-else-if="currentPage?.url == '/FMovies'" class="homeWidgets">
+						<template v-if="currentPage?.type == 'home' && hpWidgets.length" v-for="(val, key) in widgetsMap">
+							<HomeWidget
+								v-if="hpWidgets.includes(key) && key != 'menu'"
+								:id="key"
+								@showDownload="showDownload"
+								@setCurrentItemInfo="setCurrentItemInfo"
+								@removeFromDownloadHistory="removeFromDownloadHistory"
+								@visitLink="visitLink"
+								@showCurrentItemInfo="showCurrentItemInfo"
+							/>
+						</template>
+						<template v-else-if="currentPage?.url == '/FMovies'" class="homeWidgets">
 							<HomeWidget
 								id="wm-last"
 								:grid="!favItems.some(fav => fav.type == 'video')"
@@ -1187,8 +1243,8 @@ function afterImport() {
 								@visitLink="visitLink"
 								@showCurrentItemInfo="showCurrentItemInfo"
 							/>
-						</div>
-						<div v-else-if="currentPage?.url == '/FSeries'" class="homeWidgets">
+						</template>
+						<template v-else-if="currentPage?.url == '/FSeries'" class="homeWidgets">
 							<HomeWidget
 								id="ws-last"
 								:grid="!favItems.some(fav => fav.type == 'dir')"
@@ -1208,14 +1264,48 @@ function afterImport() {
 								@visitLink="visitLink"
 								@showCurrentItemInfo="showCurrentItemInfo"
 							/>
-						</div>
+						</template>
 					</div>
-					<div v-else-if="['movies', 'tvshows', 'episodes', 'seasons'].includes(currentPage?.data?.system?.setContent)" class="moviesPage" :key="`i-${currentPage.ts}`">
-						<div class="movieLinks scroller">
-							<div v-if="customHistory.length" class="movieLink isFocusable movieLink-back" :class="{isCurrent: currentItemInfo && currentItemInfo.type == 'back'}" @click.prevent="windowHistory.go(-1)" @pointerenter="!ignoreMouseEvents && setCurrentItemInfo({type: 'back'})" @itementer="setCurrentItemInfo({type: 'back'}, true)">
+					<div v-else-if="['movies', 'tvshows', 'episodes', 'seasons'].includes(currentPage?.data?.system?.setContent)" class="moviesPage" :class="`libraryLayout-${videoLayout}`" :key="`i-${currentPage.ts}`">
+						<div v-if="['grid', 'infoGrid'].includes(videoLayout)" class="dirPage scroller posters-contOuter">
+							<div class="posters-cont postersGrid">
+								<div v-if="customHistory.length && showBackItem" class="poster isFocusable" :class="{isCurrent: currentItemInfo && currentItemInfo.type == 'back', isHoverable: videoLayout == 'infoGrid'}" @click.prevent="windowHistory.go(-1)" @pointerenter="(e) => !ignoreMouseEvents && setCurrentItemInfoGrid(e, {type: 'back'})" @itementer="setCurrentItemInfo({type: 'back'}, true)" @mouseleave="onMouseLeaveGrid">
+									<div class="poster-imgCont" :class="{'poster-imgCont-ep': currentPage?.data?.system?.setContent == 'episodes'}">
+										<span class="poster-icon flex ai-c jc-c">
+											<i class="fa-solid fa-angle-left fa-fw"></i>
+										</span>
+									</div>
+									<div class="poster-text">
+										<div class="poster-title">{{ t('Back') }}</div>
+									</div>
+								</div>
+								<div v-for="link in currentPage.data.sortedMenu" class="poster isFocusable" :class="{isCurrent: currentItemInfo && currentItemInfo.url == link.url, isHoverable: videoLayout == 'infoGrid'}" @click="showDownload(link)" @pointerenter="(e) => !ignoreMouseEvents && setCurrentItemInfoGrid(e, link)" @itementer="setCurrentItemInfo(link, true)" @mouseleave="onMouseLeaveGrid">
+									<div class="poster-imgCont" :class="{'poster-imgCont-ep': currentPage?.data?.system?.setContent == 'episodes'}">
+										<span v-if="link.type == 'next'" class="poster-icon flex ai-c jc-c">
+											<i class="fa-solid fa-angle-right fa-fw"></i>
+										</span>
+										<img v-else-if="currentPage?.data?.system?.setContent == 'episodes' && link?.i18n_art?.[lang]?.thumb" :src="link?.i18n_art?.[lang]?.thumb" class="poster-img" />
+										<img v-else-if="(link?.i18n_art?.[lang]?.poster && !link?.i18n_art?.[lang]?.poster?.endsWith('.gif')) || link?.poster" :src="link?.i18n_art?.[lang]?.poster || link?.poster" class="poster-img" loading="lazy" />
+										<img v-else :src="DEFAULT_POSTER" class="poster-img" loading="lazy" />
+										<div v-if="link?.info?.rating" class="movieInfo-rating" :class="{isAverage: link?.info?.rating < 7.5 && link?.info?.rating > 4, isBad: link?.info?.	rating <= 4}">{{ link?.info?.rating }}</div>
+										<BButton  v-if="link.type != 'next'" class="posterButton-info" icon="fa-solid fa-info" @click.stop="link?.url != currentItemInfo?.url ? setCurrentItemInfo(link) : showCurrentItemInfo(link)" />
+										<i v-if="link.id && ['movies', 'tvshows'].includes(currentPage?.data?.system?.setContent) && favItems.some(fav => fav.id == link.id)" class="poster-loved fa-solid fa-heart"></i>
+										<i v-if="link?.type == 'video' && link?.url && downloadHistory.includes(link.url.split('?')[0])" class="poster-viewed fa-solid fa-check"></i>
+										<i v-else-if="currentPage?.data?.system?.setContent == 'seasons' && link?.url && downloadHistory.some(hitem => hitem.includes(`/Play/${link?.id}/${link?.info?.season}/`))" class="poster-viewed fa-solid fa-check"></i>
+										<i v-else-if="currentPage?.data?.system?.setContent != 'seasons' && link?.type == 'dir' && link.url && downloadHistory.some(hitem => hitem.includes(`/Play/${link?.id}/`))" class="poster-viewed fa-solid fa-check"></i>
+									</div>
+									<div class="poster-text">
+										<div class="poster-title" v-html="reformatString(link.i18n_info[lang].title)" />
+										<div v-if="['movies', 'tvshows'].includes(currentPage?.data?.system?.setContent) && link?.i18n_info?.[lang]?.genre" class="poster-genres">{{ link?.i18n_info?.[lang]?.genre.slice(0, 2).join(', ') }}</div>
+									</div>
+								</div>
+							</div>
+						</div>
+						<div v-else class="movieLinks scroller">
+							<div v-if="customHistory.length && showBackItem" class="movieLink isFocusable movieLink-back" :class="{isCurrent: currentItemInfo && currentItemInfo.type == 'back'}" @click.prevent="windowHistory.go(-1)" @pointerenter="!ignoreMouseEvents && setCurrentItemInfo({type: 'back'})" @itementer="setCurrentItemInfo({type: 'back'}, true)">
 								<div class="movieLink-title"><i class="fa-solid fa-angle-left fa-fw"></i> {{ t('Back') }}</div>
 							</div>
-							<template v-for="link in sortedList">
+							<template v-for="link in currentPage.data.sortedMenu">
 								<div v-if="!link.action" class="movieLink isFocusable flex ai-c" :class="{isCurrent: currentItemInfo && currentItemInfo.url == link.url}" @click="showDownload(link)" @pointerenter="!ignoreMouseEvents && setCurrentItemInfo(link)" @itementer="setCurrentItemInfo(link, true)">
 									<span class="movieLink-title" v-html="reformatString(link.i18n_info[lang].title)"></span>
 									<i v-if="link?.type == 'video' && link?.url && downloadHistory.includes(link.url.split('?')[0])" class="fa-solid fa-check"></i>
@@ -1223,7 +1313,7 @@ function afterImport() {
 									<i v-else-if="currentPage?.data?.system?.setContent != 'seasons' && link?.type == 'dir' && link.url && downloadHistory.some(hitem => hitem.includes(`/Play/${link?.id}/`))" class="fa-solid fa-check"></i>
 									<i v-if="link.id && ['movies', 'tvshows'].includes(currentPage?.data?.system?.setContent) && favItems.some(fav => fav.id == link.id)" class="fa-solid fa-heart"></i>
 									<span v-if="link?.info?.rating" class="movieLink-rating" :class="{isAverage: link?.info?.rating < 7.5 && link?.info?.rating > 4, isBad: link?.info?.rating <= 4}"></span>
-									<div class="movieLink-mobileLi movieLink-mobileLi-mobile" v-if="link.type != 'next'" @click.stop="showCurrentItemInfo">
+									<div class="movieLink-mobileLi movieLink-mobileLi-mobile" v-if="link.type != 'next'" @click.stop="showCurrentItemInfo(link)">
 										<i class="fa-solid fa-info"></i>
 									</div>
 									<div class="movieLink-mobileLi movieLink-mobileLi-tabled" v-if="link.type != 'next'" @click.stop="false">
@@ -1232,7 +1322,7 @@ function afterImport() {
 								</div>
 							</template>
 						</div>
-						<div class="movieInfo">
+						<div v-if="videoLayout != 'grid'" class="movieInfo">
 							<Transition name="layout" mode="out-in">
 								<MediaInfo
 									v-if="currentItemInfo && !['next', 'back'].includes(currentItemInfo.type)"
@@ -1252,7 +1342,7 @@ function afterImport() {
 							</Transition>
 						</div>
 					</div>
-					<div v-else-if="currentPage?.type == 'geneartor'" class="dirPage scroller">
+					<div v-else-if="currentPage?.type == 'generator'" class="dirPage scroller">
 						<div class="generatorSection">
 							<BButton :icon="generatorShowsData.loading ? 'fa-solid fa-spinner fa-spin-pulse' : 'fa-solid fa-shuffle'" :disabled="!generatorShows.length || generatorShowsData.loading" @click.stop="getRandomShowsEpisode">{{ t('Find next episode') }}</BButton>
 							<Transition name="layout" mode="out-in">
@@ -1274,7 +1364,7 @@ function afterImport() {
 								<div v-if="generatorShowsHistory.length" class="generatorSection divided">
 									<h3>{{ t('Last generated') }}</h3>
 									<div class="generatorSetcion-historyItems line">
-										<DownloadLink v-for="historyItem in generatorShowsHistory" class="isHoverable" :link="historyItem" :isSupportedOs :isDesktopOs  @downloadFile="generatorDownloadFile" @copyFileLink="(link) => copyFileLink({url: link.url[generatorQuality]})">
+										<DownloadLink v-for="historyItem in generatorShowsHistory" class="isHoverable" :link="historyItem" :isSupportedOs :isDesktopOs  @downloadFile="generatorDownloadFile" @copyFileLink="generatorCopyFileLink">
 											<span class="asLink" @click.stop="visitLink({url: `/FGet/${historyItem.show}`, title: showsMap[historyItem.show]})">{{ showsMap[historyItem.show] }}</span> - {{ historyItem.epname }}
 										</DownloadLink>
 									</div>
@@ -1291,6 +1381,10 @@ function afterImport() {
 				</Transition>
 			</main>
 			<aside class="mobileNav flex">
+				<div class="mobileNav-link" @click.prevent="appState.menuOpened = true">
+					<i class="fa-solid fa-bars mobileNav-icon"></i>
+					<div class="mobileNav-title">Menu</div>
+				</div>
 				<div class="mobileNav-link" :class="{isActive: currentPage?.id == 'home'}" @click.prevent="currentHistoryIndex > 0 ? windowHistory.go(-currentHistoryIndex) : getHomePage(true)">
 					<i class="fa-solid fa-home mobileNav-icon"></i>
 					<div class="mobileNav-title">{{ t('Home') }}</div>
@@ -1417,6 +1511,20 @@ function afterImport() {
 				</div>
 				<div class="downloadModal-link flex ai-c isHoverable" :class="{isActive: currentPage?.sortBy == 'shortest'}" @click="setCurrentSortBy('shortest')">
 					<div class="downloadModal-linkTitle flex ai-c">{{ t('Shortest') }}</div>
+				</div>
+			</BModal>
+			<BModal v-model:open="showLayoutSelectModal" narrow :title="t('Layout')">
+				<div class="downloadModal-link flex ai-c isHoverable" :class="{isActive: videoLayout == 'listLeft'}" @click="videoLayout = 'listLeft'">
+					<div class="downloadModal-linkTitle flex ai-c">{{ t('List left') }}</div>
+				</div>
+				<div class="downloadModal-link flex ai-c isHoverable" :class="{isActive: videoLayout == 'listRight'}" @click="videoLayout = 'listRight'">
+					<div class="downloadModal-linkTitle flex ai-c">{{ t('List right') }}</div>
+				</div>
+				<div class="downloadModal-link flex ai-c isHoverable" :class="{isActive: videoLayout == 'grid'}" @click="videoLayout = 'grid'">
+					<div class="downloadModal-linkTitle flex ai-c">{{ t('Grid') }}</div>
+				</div>
+				<div class="downloadModal-link flex ai-c isHoverable" :class="{isActive: videoLayout == 'infoGrid'}" @click="videoLayout = 'infoGrid'">
+					<div class="downloadModal-linkTitle flex ai-c">{{ t('Grid with info') }}</div>
 				</div>
 			</BModal>
 			<BModal v-model:open="searchData.genreSearchShow" narrow :title="`${t('Search')} ${searchIdMap['by-genre'][lang]}`">

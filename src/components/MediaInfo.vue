@@ -79,7 +79,7 @@ onBeforeUnmount(() => {
 			<div v-if="currentItemInfo.info.mpaa" class="movieInfo-mpaa">{{ currentItemInfo.info.mpaa }}</div>
 		</div>
 		<h2 v-if="currentPage?.data?.system?.setContent == 'episodes'" class="movieInfo-title">{{ String(currentItemInfo.info.season || 0).padStart(2, 0) }}x{{ String(currentItemInfo.info.episode).padStart(2, 0) }} - {{ currentItemInfo.i18n_info[lang].epname }}</h2>
-		<h2 v-else class="movieInfo-title">{{ currentItemInfo.i18n_info[lang].otitle }}<span v-if="currentPage?.data?.system?.setContent == 'seasons'"> - {{ t('Season') }} {{ String(currentItemInfo.info.season).padStart(2, 0) }}</span></h2>
+		<h2 v-else class="movieInfo-title">{{ currentItemInfo.i18n_info[lang].otitle }}<span v-if="currentPage?.data?.system?.setContent == 'seasons'"> - {{ t('Season') }} {{ String(currentItemInfo.info.season ?? 0).padStart(2, 0) }}</span></h2>
 		<div class="movieInfo-meta light">
 			<span v-if="currentItemInfo.i18n_info[lang].genre" class="movieInfo-year">{{ currentItemInfo.i18n_info[lang].genre.join(', ') }}</span>
 			<span v-if="currentItemInfo.info.year" class="movieInfo-year">{{ currentItemInfo.info.year }}</span>

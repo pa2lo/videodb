@@ -4,7 +4,7 @@ import { t } from '@/labels'
 import BButton from './BButton.vue'
 import BRadio from './BRadio.vue'
 
-import { lang, listsort, theme, streamsLang, incDV, incHDR, winPlayer, androidPlayer, iosPlayer, hpWidgets, downloadHistory, favItems, generatorQuality, generatorShows, generatorShowsHistory, widgetsMap, bookmarks, showToast, uid } from '../store'
+import { lang, listsort, theme, streamsLang, incDV, incHDR, winPlayer, androidPlayer, iosPlayer, hpWidgets, downloadHistory, favItems, generatorQuality, generatorShows, generatorShowsHistory, widgetsMap, bookmarks, showToast, uid, copyLinkButton, showBackItem } from '../store'
 import { sync } from '@/sync'
 
 defineProps({
@@ -188,6 +188,8 @@ const iosPlayerOptions = [
 				</div>
 			</template>
 		</div>
+		<BRadio label="Show copy link button" :options="boolOptions" v-model="copyLinkButton" />
+		<BRadio label="Show 'Back' item" :options="boolOptions" v-model="showBackItem" />
 		<div class="blockLabel baseLine">
 			<span class="blockLabel-label">{{ t('Homepage widgets') }}</span>
 			<div class="cbGroup">
