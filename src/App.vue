@@ -1136,7 +1136,7 @@ function afterImport() {
 				<div class="menu-items">
 					<MenuLink href="/" icon="fa-solid fa-home" :title="t('Home')" :isActive="currentPage?.type == 'home'" @click.prevent="currentHistoryIndex > 0 ? windowHistory.go(-currentHistoryIndex) : getHomePage(true)" />
 					<MenuLink icon="fa-solid fa-search" :title="t('Search')" @click.prevent="showSearch" />
-					<MenuLink v-for="link in homepageLinks['menu']" :icon="link.icon" :title="link.i18n_info[lang].title" :isActive="(link.action && currentPage?.type == link.action) || (link.url && currentPage?.url?.startsWith(link.url))" @click.prevent="visitLinkFromHome(link)" />
+					<MenuLink v-for="link in homepageLinks['menu']" :icon="link.icon" :title="link.i18n_info[lang].title" :isActive="(link.action && currentPage?.type == link.action) || (link.url && currentPage?.url?.startsWith(link.url)) || (link.id == 'series' && ['seasons', 'episodes'].includes(currentPage?.data?.system?.setContent))" @click.prevent="visitLinkFromHome(link)" />
 				</div>
 				<div class="menu-items">
 					<MenuLink v-if="installPrompt || iOsInstallPrompt" icon="fa-solid fa-cloud-arrow-down" :title="t('Download App')" @click.prevent="installApp" />

@@ -32,7 +32,7 @@ onMounted(async () => {
 
 		if (!list.length) return
 
-		if (list.length > 30) list.length = 30
+		if (!props.grid && list.length > 30) list.length = 30
 
 		loading.value = true
 
@@ -106,12 +106,20 @@ function getLinkData(link, index) {
 		isLast: index == content.value.menu.length-1 || (index == content.value.menu.length-2 && content.value.menu[index+1].type == 'next')
 	}
 }
+
+let ignoreMouseEnter = false
+function beforeListLeave() {
+	ignoreMouseEnter = true
+}
+function afterListEnter() {
+	ignoreMouseEnter = false
+}
 </script>
 
 <template>
 	<div v-if="loading || content?.menu?.length" class="hpWidget" ref="widgetEl">
 		<h3 class="hpWidget-title">{{ widgetsMap[id]?.sectionTitle[lang] }}</h3>
-		<Transition appear name="layout" mode="out-in" @enter="onPostersEnter">
+		<Transition appear name="layout" mode="out-in" @enter="onPostersEnter" @beforeLeave="beforeListLeave" @afterEnter="afterListEnter">
 			<div v-if="loading" class="hpWidget-loader"><i class="fa-solid fa-spinner fa-spin-pulse fa-4x"></i></div>
 			<div v-else-if="content" class="posters-contOuter" :class="grid ? 'posters-contOuter-grid' : 'posters-contOuter-slider'">
 				<div class="posters-cont" :class="[grid ? 'postersGrid' : 'postersSlider scroller isHorizontal isFocusable' ,{isCurrent: !grid && currentItemInfo?.hoverId?.startsWith(id)}]" @itementer="scrollerItemEnter" ref="scrollerEl" @scroll="onScrollerScroll">
@@ -126,8 +134,8 @@ function getLinkData(link, index) {
 									isCurrent: grid && currentItemInfo?.hoverId == `${id}-${link?.id}`
 								}
 							]"
-							@click="$emit('showDownload', link)"
-							@pointerenter="!ignoreMouseEvents && $emit('setCurrentItemInfo', getLinkData(link, linkIndex))"
+							@click="$emit('showDownload', getLinkData(link, linkIndex))"
+							@pointerenter="!ignoreMouseEvents && !ignoreMouseEnter && $emit('setCurrentItemInfo', getLinkData(link, linkIndex))"
 							@itementer="$emit('setCurrentItemInfo', getLinkData(link, linkIndex), true)"
 						>
 							<div class="poster-imgCont">
@@ -138,7 +146,7 @@ function getLinkData(link, index) {
 								<template v-if="id != 'favs' && link?.url">
 									<i v-if="link.id && favItems.some(fav => fav.id == link.id)" class="poster-loved fa-solid fa-heart"></i>
 								</template>
-								<template v-if="id == 'favs' && link?.url">
+								<template v-if="!['wm-last', 'ws-last'].includes(id) && link?.url">
 									<i v-if="link?.type == 'video' && downloadHistory.includes(link.url)" class="poster-viewed fa-solid fa-check"></i>
 									<i v-else-if="link?.type == 'dir' && downloadHistory.some(hitem => hitem.includes(`/Play/${link?.id}/`))" class="poster-viewed fa-solid fa-check"></i>
 								</template>
