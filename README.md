@@ -35,3 +35,9 @@ The **Screenshots** folder contains previews of the UI.
 - added PHP scripts (proxy for fetching data, link shortener, sync...)
 - support for casting links to Chromecast (disabled due to file format)
 - bugfixes + optimizations
+
+## Update 10/25
+- new theme
+- rating button opens CSFD page
+- video thumbnail on episodes page
+- optimized auth check and other improvements

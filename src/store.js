@@ -8,7 +8,6 @@ export const incHDR = useStorage('incHDR', 1)
 export const incDV = useStorage('incHDR', 0)
 export const token = useStorage('token', null)
 export const downloadToken = useStorage('downloadToken', null)
-export const tokenDate = useStorage('tokenDate', null)
 export const uid = useStorage('uid', `9802BF2F-C445-552D-A3EE-${Date.now()}`, true)
 export const downloadHistory = useStorage('downloadHistory', [])
 export const favItems = useStorage('favItems', [])
@@ -332,7 +331,8 @@ export const homepageLinks = {
 				"cs": {"title": "Filmy"},
 				"sk": {"title": "Filmy"}
 			},
-			"icon": "fa-solid fa-film"
+			"icon": "fa-solid fa-film",
+			'activeURLs': ['/FTv','/Search/search-movie']
 		},
 		{
 			"type": "dir",
@@ -343,7 +343,8 @@ export const homepageLinks = {
 				"cs": {"title": "Seriály"},
 				"sk": {"title": "Seriály"}
 			},
-			"icon": "fa-solid fa-tv"
+			"icon": "fa-solid fa-tv",
+			'activeURLs': ['/Search/search-series']
 		},
 		{
 			"type": "dir",

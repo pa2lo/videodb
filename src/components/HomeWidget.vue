@@ -141,8 +141,8 @@ function afterListEnter() {
 							<div class="poster-imgCont">
 								<img v-if="(link?.i18n_art?.[lang]?.poster && !link?.i18n_art?.[lang]?.poster?.endsWith('.gif')) || link?.poster" :src="link?.i18n_art?.[lang]?.poster || link?.poster" class="poster-img" loading="lazy" />
 								<img v-else :src="DEFAULT_POSTER" class="poster-img" loading="lazy" />
-								<div v-if="link?.info?.rating" class="movieInfo-rating" :class="{isAverage: link?.info?.rating < 7.5 && link?.info?.rating > 4, isBad: link?.info?.	rating <= 4}">{{ link?.info?.rating }}</div>
-								<BButton class="posterButton-info" icon="fa-solid fa-info" @click.stop="$emit('showCurrentItemInfo', link)" />
+								<button v-if="link?.info?.rating" class="movieInfo-rating movieInfo-rating-button" :class="{isAverage: link?.info?.rating < 7.5 && link?.info?.rating > 4, isBad: link?.info?.	rating <= 4}" @click.stop="$emit('showMovieDBSite', 'csfd', link.unique_ids?.csfd || null, link)">{{ link?.info?.rating }}</button>
+								<BButton class="posterButton-info" icon="fa-solid fa-info" @click.stop="$emit('showCurrentItemInfo', getLinkData(link, linkIndex))" />
 								<template v-if="id != 'favs' && link?.url">
 									<i v-if="link.id && favItems.some(fav => fav.id == link.id)" class="poster-loved fa-solid fa-heart"></i>
 								</template>

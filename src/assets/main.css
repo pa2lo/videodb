@@ -257,7 +257,7 @@ button, .button {
 button:focus, .button:focus {
 	outline: none;
 }
-:is(button, .button):not(:disabled, .buttonDark, .buttonOutline, .modal-button, .toast-x, .install-x, .scroller-arrow, .backBttn):is(:active, :focus-visible) {
+:is(button, .button):not(:disabled, .buttonDark, .buttonOutline, .modal-button, .toast-x, .install-x, .scroller-arrow, .movieInfo-rating-button):is(:active, :focus-visible) {
 	border-color: var(--accent);
 	background: var(--accentHover);
 }
@@ -288,7 +288,7 @@ button:focus, .button:focus {
 }
 
 @media (pointer: fine) {
-	:is(button, .button):not(:disabled, .buttonDark, .buttonOutline, .modal-button, .toast-x, .install-x, .scroller-arrow, .backBttn):is(:hover) {
+	:is(button, .button):not(:disabled, .buttonDark, .buttonOutline, .modal-button, .toast-x, .install-x, .scroller-arrow, .movieInfo-rating-button):is(:hover) {
 		border-color: var(--accent);
 		background: var(--accentHover);
 	}
@@ -298,6 +298,9 @@ button:focus, .button:focus {
 	}
 	.buttonOutline:not(:disabled):is(:hover) {
 		color: var(--accent);
+	}
+	.movieInfo-rating-button:hover {
+		box-shadow: inset 0 0 1rem 1rem #0002;
 	}
 }
 
@@ -804,6 +807,11 @@ button:not(.basicIcon, .posterButton-info) :is(.fa-solid, .fa-regular, .fa-brand
 	margin-bottom: 1.25rem;
 	min-height: 7rem;
 }
+.movieInfo-posterCont-ep {
+	--aspectRatio: initial;
+	height: calc(100% - .5rem);
+	place-content: center;
+}
 .movieInfo-poster {
 	width: 100%;
 	max-height: min(45vh, 20rem);
@@ -1260,6 +1268,7 @@ button:not(.basicIcon, .posterButton-info) :is(.fa-solid, .fa-regular, .fa-brand
 .scroller-arrow {
 	position: absolute;
 	top: calc(var(--galleryBase) * 40 / 27 / 2 - .4375rem);
+	width: 2.875rem;
 }
 .scroller-arrow-left {
 	left: calc(var(--sectionHorizontal) * -1);
@@ -1289,6 +1298,12 @@ button:not(.basicIcon, .posterButton-info) :is(.fa-solid, .fa-regular, .fa-brand
 	border: none;
 	padding: 0;
 }
+.movieInfo-rating-button {
+	padding: 0;
+	font-family: inherit;
+	border: none;
+	transition: box-shadow .1s;
+}
 .poster-loved, .poster-viewed {
 	top: .5625rem;
 	/* filter: drop-shadow(0px 0px 1px black); */
@@ -1306,7 +1321,7 @@ button:not(.basicIcon, .posterButton-info) :is(.fa-solid, .fa-regular, .fa-brand
 	left: .625rem;
 }
 
-.poster.loadingInfo:not(.isCurrent) .poster-imgCont::after {
+/* .poster.loadingInfo:not(.isCurrent) .poster-imgCont::after {
 	content: '';
 	position: absolute;
 	bottom: 0.1875rem;
@@ -1319,7 +1334,7 @@ button:not(.basicIcon, .posterButton-info) :is(.fa-solid, .fa-regular, .fa-brand
 @keyframes willLoad {
 	from {width: 0;}
 	to {width: calc(100% - 1.25rem);}
-}
+} */
 
 .modal-movieInfo-arrows, .movieInfo-topButtons {
 	position: sticky;
@@ -1535,8 +1550,8 @@ button:not(.basicIcon, .posterButton-info) :is(.fa-solid, .fa-regular, .fa-brand
 	background: var(--bg2);
 }
 .collapseMenu-toggle {
-	margin-left: -.5rem;
-	display: none;
+	margin-left: -.375rem;
+	display: inline-flex;
 }
 
 .menuLink-hoverTitle {
@@ -1627,6 +1642,9 @@ button:not(.basicIcon, .posterButton-info) :is(.fa-solid, .fa-regular, .fa-brand
 		grid-row: 1 / 7;
 		margin: 0;
 	}
+	.modal-movieInfo-cont .movieInfo-posterCont-ep {
+		height: 100%;
+	}
 	.modal-movieInfo-cont .movieInfo-buttons {
 		grid-row: 3;
 		margin: 0 0 .25rem;
@@ -1637,8 +1655,8 @@ button:not(.basicIcon, .posterButton-info) :is(.fa-solid, .fa-regular, .fa-brand
 	.modal-movieInfo-cont .movieInfo-fanart {
 		height: 108%;
 		width: 100%;
-		-webkit-mask-image: linear-gradient(to right, var(--overlayMask), transparent 60%);
-		mask-image: linear-gradient(to right, var(--overlayMask), transparent 60%);
+		-webkit-mask-image: linear-gradient(to right, var(--overlayMask), transparent 75%);
+		mask-image: linear-gradient(to right, var(--overlayMask), transparent 75%);
 	}
 	.modal-movieInfo-cont .movieInfo-topButtons {
 		grid-column: 3;
@@ -1659,12 +1677,12 @@ button:not(.basicIcon, .posterButton-info) :is(.fa-solid, .fa-regular, .fa-brand
 	.menu {
 		transition: width .15s;
 	}
-	.collapseMenu-toggle {
+	/* .collapseMenu-toggle {
 		display: inline-flex;
-	}
-	.logo-desktop {
+	} */
+	/* .logo-desktop {
 		display: none;
-	}
+	} */
 	.menuClosed {
 		padding-left: calc(4.25rem + 1px);
 	}
@@ -1758,9 +1776,9 @@ button:not(.basicIcon, .posterButton-info) :is(.fa-solid, .fa-regular, .fa-brand
 		display: none;
 	}
 
-	.header-buttons-outer {
+	/* .header-buttons-outer {
 		margin-right: 0;
-	}
+	} */
 
 	.dirLinks {
 		--gridGap: .875rem;
@@ -1807,16 +1825,16 @@ button:not(.basicIcon, .posterButton-info) :is(.fa-solid, .fa-regular, .fa-brand
 		opacity: 1;
 	}
 
-	.pageTitle {
+	/* .pageTitle {
 		margin-left: -3.25rem;
-	}
-	.pageTitle > button {
+	} */
+	/* .pageTitle > button {
 		margin-left: 0;
-	}
-	.pageTitle button:disabled {
+	} */
+	/* .pageTitle button:disabled {
 		opacity: 0;
 		pointer-events: none;
-	}
+	} */
 
 	.dirLinks {
 		--galleryBase: 9.5rem;
@@ -1887,4 +1905,366 @@ button:not(.basicIcon, .posterButton-info) :is(.fa-solid, .fa-regular, .fa-brand
 	padding-block: 0;
 	max-height: 0;
 	border-block-width: 0px;
+}
+
+/* theme v2 */
+.theme-v2 {
+	--light: ;
+	--dark: initial;
+	--border1: #fff1;
+	--ico-bttn-br: 2rem;
+	--modal-br: .75rem;
+	--el-br: .5rem;
+}
+.theme-v2 .loginBox {
+	background: #fff2;
+	border-radius: .75rem;
+}
+.theme-v2 body {
+	background: radial-gradient(ellipse at top center, transparent 50%, #0009), linear-gradient(45deg, hsl(198.95deg 95% 9%), hsl(170deg 75% 10%));
+}
+.theme-v2 .button {
+	border-radius: .5rem;
+	padding-block: .75rem;
+}
+.theme-v2 :is(.buttonUnstyled) {
+	padding-block: 0;
+}
+.theme-v2 :is(.modal-movieInfo-arrows, .movieInfo-topButtons) :is(button, .isIconOnly) {
+	padding-block: 0;
+	height: 2.625rem;
+	width: 2.625rem;
+}
+.theme-v2 :is(.buttonUnstyled, .button.isIconOnly:not(.modal-button)),
+.theme-v2 .dirLink {
+	border-radius: 2rem;
+}
+.theme-v2 .header {
+	background: transparent;
+	border: none;
+}
+.theme-v2 .buttonUnstyled {
+	background: transparent;
+}
+.theme-v2 :is(.buttonDark:not(.buttonUnstyled), .downloadModal-linkButtons .button, .dirLink, .movieLink-mobileLi-mobile .fa-info) {
+	background: #fff2;
+}
+.theme-v2 :is(.posterButton-info, .poster-loved, .poster-viewed) {
+	background: #0006;
+}
+.theme-v2 :is(.poster-loved, .poster-viewed) {
+	line-height: 2rem;
+	width: 2rem;
+}
+.theme-v2 .button:not(.buttonUnstyled, .modal-button),
+.theme-v2 :is(.poster-loved, .poster-viewed),
+.theme-v2 .dirLink {
+	backdrop-filter: blur(.75rem);
+}
+.theme-v2 .dirLink {
+	background: #fff2;
+	flex: 0 0 auto;
+	min-height: auto;
+	padding: .625rem 1.5rem;
+	transition: background-color .1, color .1s, box-shadow .1s;
+}
+.theme-v2 .dirLink.isCurrent {
+	border-color: #fff1;
+	background: #fff;
+	color: #000;
+}
+
+.theme-v2 .scroller-arrow {
+	width: 2.625rem;
+}
+.theme-v2 :is(.movieInfo-rating:not(.movieInfo-rating-button), .movieInfo-mpaa) {
+	width: 2.625rem;
+	height: 2.625rem;
+}
+.theme-v2 .modal-movieInfo-arrows button {
+	margin-inline: max(-1.3125rem, var(--sectionHorizontal) * -1);
+}
+.theme-v2 .modal-movieInfo-arrows, .theme-v2 .movieInfo-topButtons :is(button, .isIconOnly) {
+	margin-bottom: -2.625rem;
+}
+
+.theme-v2 .button.modal-button {
+	width: 2.5rem;
+	padding: .75rem 0;
+}
+
+.theme-v2 .modal-cont {
+	padding: .25rem;
+	border: none;
+	border-radius: .75rem;
+}
+
+.theme-v2 :is(.modal-title, .modal-movieInfo-cont, .modal-cont .movieInfo-fanart-cont, .downloadModal-link, .movieLink, .poster-imgCont, .modalDownloadLinks, .movieDB-modal iframe) {
+	border-radius: .5rem;
+}
+
+.theme-v2 .modal-title {
+	margin-bottom: 0.25rem;
+	border: none;
+	background-color: #fff1;
+}
+.theme-v2 .modal-ns .modal-title {
+	margin-bottom: 0;
+}
+.theme-v2 .modal-movieInfo-cont {
+	background-color: #0006;
+}
+.theme-v2 .downloadModal-episodeInfo {
+	margin-top: 0.25rem;
+	padding-right: 1.625rem;
+}
+.theme-v2 .movieLink {
+	padding-block: .5rem;
+	min-height: 3rem;
+}
+.theme-v2 .movieLink-title {
+	line-height: 1.25;
+	display: -webkit-box;
+	line-clamp: 2;
+	-webkit-line-clamp: 2;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	-webkit-box-orient: vertical;
+}
+.theme-v2 .movieLinks {
+	background-color: #0006;
+	padding: .25rem;
+}
+.theme-v2 .libraryLayout-listLeft .movieInfo, .theme-v2 .libraryLayout-infoGrid .movieInfo, .theme-v2 .libraryLayout-listRight .movieLinks {
+	border: none;
+}
+.theme-v2 .downloadModal-link {
+	padding: .375rem 1.5rem .375rem 1.375rem;
+}
+.theme-v2 .downloadModal-linkButtons {
+	gap: .25rem;
+}
+.theme-v2 :is(.downloadModal-link, .movieLink) {
+	border: 2px solid transparent;
+	background-color: transparent;
+	overflow: hidden;
+}
+.theme-v2 .downloadModal-link.isActive {
+	background: #fff3;
+	color: #fff;
+	font-weight: bold;
+}
+.theme-v2 :is(.movieLink.isCurrent, .downloadModal-link.isCurrent, .downloadModal-link.isHoverable:not(.isActive):hover) {
+	background-color: #fff2;
+	color: #fff;
+	border-color: #fff;
+}
+.theme-v2 :is(.modalDownloadLinks, .generatorSetcion-historyItems) {
+	background-color: #0006;
+	border: none;
+}
+.theme-v2 .generatorSetcion-historyItems {
+	padding: 0.25rem;
+	border-radius: .75rem;
+}
+
+.theme-v2 .poster-imgCont {
+	overflow: hidden;
+	background-color: #0006;
+	border-color: transparent;
+}
+.theme-v2 .poster:is(.isCurrentLR, .isCurrent, .isHoverable:hover) .poster-imgCont {
+	box-shadow: 0 0 0 2px #fff;
+	border-color: transparent;
+}
+.theme-v2 .poster .poster-title {
+	color: color-mix(in srgb, var(--text) 85%, transparent);
+}
+.theme-v2 .poster:is(.isCurrentLR, .isCurrent, .isHoverable:hover) .poster-title {
+	color: #fff;
+}
+
+.theme-v2 .libraryLayout-infoGrid .movieInfo {
+	background-color: #0006;
+	border-radius: 1rem 0 0 0;
+}
+.theme-v2 .libraryLayout-infoGrid .movieInfo-fanart-cont {
+	border-radius: 1rem 0 0 0;
+}
+
+@media (pointer: fine) {
+	.theme-v2 :is(button, .button, .buttonDark):not(:disabled, .buttonOutline, .modal-button, .toast-x, .install-x, .movieInfo-rating-button):is(:hover) {
+		border-color: #fff1;
+		background: #fff;
+		color: #000;
+	}
+	.theme-v2 :is(.mobileNav-link, .menuLink):hover {
+		background-color: #fff;
+		color: #000;
+	}
+}
+
+.theme-v2 .dirPage {
+	padding-top: 0.625rem;
+}
+.theme-v2 .libraryLayout-infoGrid .dirPage.posters-contOuter {
+	padding-inline: calc(var(--sectionHorizontal) / 2);
+	width: auto;
+}
+
+.theme-v2 .menu {
+	border-right: none;
+	background: #0006;
+	backdrop-filter: blur(.75rem);
+}
+.theme-v2 .menuLink {
+	border-radius: .5rem;
+	transition: background-color .1s, color .1s;
+}
+.theme-v2 .menuLink.isActive {
+	background-color: #fff2;
+	color: #fff;
+}
+
+.theme-v2 .dirLinks-shows .dirLink {
+	flex-basis: var(--basis);
+	border-radius: .5rem;
+}
+.theme-v2 .dirLink.isHoverable:hover {
+	border-color: #fff;
+	box-shadow: inset 0 0 0 1px #fff;
+}
+
+@media screen and (max-width: 980px) {
+	.theme-v2 .v2-mScrollable {
+		justify-content: flex-start;
+		overflow: auto;
+		flex-wrap: nowrap;
+		margin-inline: calc(var(--sectionHorizontal) * -1);
+		padding-inline: var(--sectionHorizontal);
+		-webkit-mask-image: linear-gradient(to right, transparent, black var(--sectionHorizontal), black calc(100% - var(--sectionHorizontal)), transparent 100%);
+		mask-image: linear-gradient(to right, transparent, black var(--sectionHorizontal), black calc(100% - var(--sectionHorizontal)), transparent 100%);
+	}
+	.theme-v2 .v2-mScrollable .dirLink:first-child {
+		margin-left: auto;
+	}
+	.theme-v2 .v2-mScrollable .dirLink:last-child {
+		margin-right: auto;
+	}
+
+	.theme-v2 .header-buttons {
+		background: #0006;
+		backdrop-filter: blur(12px);
+		border-radius: .5rem;
+		overflow: hidden;
+	}
+	.theme-v2 .header-buttons button.buttonDark.isIconOnly {
+		border-radius: 0;
+		background-color: transparent;
+	}
+	.theme-v2 .header-buttons button.buttonDark.isIconOnly:not(:disabled):hover {
+		background-color: #fff;
+	}
+}
+@media screen and (max-width: 630px) {
+	.theme-v2 .movieLinks {
+		background: transparent;
+		padding: 0;
+	}
+	.theme-v2 .libraryLayout-infoGrid .dirPage.posters-contOuter {
+		padding-inline: var(--sectionHorizontal);
+	}
+}
+
+.theme-v2 :is(.dirPage, .movieInfo, .modal, .moviesPage, .menu) {
+	scrollbar-color: #fff4 transparent;
+}
+
+.theme-v2 :is(.input, .select, .radioGroup) {
+	background: #0006;
+	border-radius: .5rem;
+	transition: border-color .1s, box-shadow .1s;
+	height: 2.625rem;
+}
+.theme-v2 .radioGroup {
+	padding: 1px;
+}
+.theme-v2 .radioGroup-label:first-child {
+	border-radius: .375rem 0 0 .375rem;
+}
+.theme-v2 .radioGroup-label:last-child {
+	border-radius: 0 .375rem .375rem 0;
+}
+.theme-v2 :is(.input, .select):not(:read-only):is(:hover, :focus-visible),
+.theme-v2 .radioGroup:has(.radioGroup-label:hover) {
+	border-color: #fff;
+	box-shadow: inset 0 0 0 1px #fff;
+}
+
+.theme-v2 .radioGroup-label {
+	height: 2.375rem;
+	line-height: 2.375rem;
+	background: transparent;
+	color: #fffd;
+}
+.theme-v2 .radioGroup-label:hover {
+	color: #fff;
+	background: #fff2;
+}
+.theme-v2 .radioGroup-label.isChecked {
+	color: #fff;
+	background: #fff3;
+}
+
+.theme-v2 .modal-buttons {
+	top: 0.5rem;
+	right: 0.5rem;
+}
+
+@media screen and (min-width: 631px) {
+	.theme-v2 .menuClosed .menu {
+		width: 4.25rem;
+	}
+
+	.theme-v2 :is(.libraryLayout-listLeft .movieLinks, .libraryLayout-listRight :is(.movieInfo, .movieInfo-fanart-cont)) {
+		border-top-right-radius: .75rem;
+	}
+	.theme-v2 :is(.libraryLayout-listRight .movieLinks, .libraryLayout-listLeft :is(.movieInfo, .movieInfo-fanart-cont)) {
+		border-top-left-radius: .75rem;
+	}
+}
+
+.theme-v2 .mobileNav {
+	background: #0006;
+	border: none;
+}
+.theme-v2 .mobileNav-link {
+	border: none;
+}
+.theme-v2 :is(.mobileNav-link, .downloadModal-link).isActive {
+	color: #fff;
+}
+
+.theme-v2 .cbGroup-cb {
+	background-color: #0006;
+	border-radius: .25rem;
+}
+.theme-v2 .cbGroup-cb:checked {
+	background: #fff;
+}
+.theme-v2 :is(.cbGroup-cb:hover, .cbGroup-cb:checked) {
+	border-color: #fff;
+}
+.theme-v2 .cbGroup-cb::before {
+	box-shadow: inset -2px -2px #000;
+}
+
+@container (min-width: 580px) {
+	.theme-v2 :is(.libraryLayout-listLeft, .libraryLayout-listRight) .movieInfo-topButtons :is(button, .isIconOnly) {
+		margin-bottom: .75rem;
+	}
+}
+
+.theme-v2 .movieInfo-topButtons button.isIconOnly:is(:not(:hover), :disabled:hover) {
+	text-shadow: 0 0 .25rem #0008;
 }

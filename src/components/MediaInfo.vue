@@ -1,5 +1,5 @@
 <script setup>
-import { onBeforeUnmount } from 'vue'
+import { computed, onBeforeUnmount } from 'vue'
 
 import { t } from '@/labels'
 
@@ -55,6 +55,11 @@ function onTouchEnd(e) {
 onBeforeUnmount(() => {
 	if (eventsAdded) document.removeEventListener('touchend', onTouchEnd)
 })
+
+const showPoster = computed(() => {
+	if (currentPage.value?.data?.system?.setContent == 'episodes' && currentItemInfo.value?.i18n_art?.[lang.value]?.thumb && !currentItemInfo.value.i18n_art[lang.value].thumb.endsWith('.gif')) return true
+	else return false
+})
 </script>
 
 <template>
@@ -72,8 +77,9 @@ onBeforeUnmount(() => {
 			<BButton v-if="showArrows" class="ml-a" dark icon="fa-solid fa-chevron-left" :disabled="currentItemInfo?.isFirst" :title="t('Previous video')" @click="$emit('findNextMedia', false)" />
 			<BButton v-if="showArrows" dark icon="fa-solid fa-chevron-right" :disabled="currentItemInfo?.isLast" :title="t('Next video')" @click="$emit('findNextMedia', true)" />
 		</div>
-		<div class="movieInfo-posterCont">
-			<img v-if="currentItemInfo.i18n_art[lang]?.poster && !currentItemInfo.i18n_art[lang]?.poster.endsWith('.gif')" :src="currentItemInfo.i18n_art[lang].poster" class="movieInfo-poster" />
+		<div class="movieInfo-posterCont" :class="{'movieInfo-posterCont-ep': showPoster}">
+			<img v-if="showPoster" :src="currentItemInfo.i18n_art[lang].thumb" class="movieInfo-poster movieInfo-poster-ep" />
+			<img v-else-if="currentItemInfo.i18n_art[lang]?.poster && !currentItemInfo.i18n_art[lang]?.poster.endsWith('.gif')" :src="currentItemInfo.i18n_art[lang].poster" class="movieInfo-poster" />
 			<img v-else :src="DEFAULT_POSTER" class="movieInfo-poster" />
 			<div v-if="currentItemInfo.info.rating" class="movieInfo-rating" :class="{isAverage: currentItemInfo.info.rating < 7.5 && currentItemInfo.info.rating > 4, isBad: currentItemInfo.info.rating <= 4}">{{ currentItemInfo.info.rating }}</div>
 			<div v-if="currentItemInfo.info.mpaa" class="movieInfo-mpaa">{{ currentItemInfo.info.mpaa }}</div>

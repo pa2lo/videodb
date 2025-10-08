@@ -124,7 +124,8 @@ const streamsLangOptions = [
 const themeOptions = [
 	{ title: 'Auto', value: '' },
 	{ title: 'Dark', value: 'dark' },
-	{ title: 'Light', value: 'light' }
+	{ title: 'Light', value: 'light' },
+	{ title: 'New', value: 'v2' }
 ]
 const randomEpisodeQualityOptions = [
 	{ title: 'Low', value: 'low' },

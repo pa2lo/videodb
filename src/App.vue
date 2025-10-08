@@ -13,7 +13,7 @@ import AppSettings from './components/AppSettings.vue'
 import DownloadLink from './components/DownloadLink.vue'
 import SyncModalContent from './components/SyncModalContent.vue'
 
-import { lang, listsort, streamsLang, token, downloadToken, tokenDate, uid, downloadHistory, favItems, generatorShows, generatorQuality, generatorShowsHistory, bookmarks, theme, videoLayout, hpWidgets, winPlayer, androidPlayer, iosPlayer, widgetsMap, currentPage, currentItemInfo, toasts, showToast, destroyToast, showsMap, searchIdMap, genresMap, homepageLinks, moviesAdditionalLinks, ignoreMouseEvents, getQueryParams, syncKey, syncError, syncing, gCastConnected, showBackItem } from './store'
+import { lang, listsort, streamsLang, token, downloadToken, uid, downloadHistory, favItems, generatorShows, generatorQuality, generatorShowsHistory, bookmarks, theme, videoLayout, hpWidgets, winPlayer, androidPlayer, iosPlayer, widgetsMap, currentPage, currentItemInfo, toasts, showToast, destroyToast, showsMap, searchIdMap, genresMap, homepageLinks, moviesAdditionalLinks, ignoreMouseEvents, getQueryParams, syncKey, syncError, syncing, gCastConnected, showBackItem } from './store'
 import { getProxyData, abortSignalAny } from './helpers'
 import { sync } from './sync'
 import { gCast } from './gCast'
@@ -49,7 +49,7 @@ const appState = shallowReactive({
 	krPass: '',
 	krRemember: false,
 	videoUrl: '',
-	autoLogin: false,
+	initLoad: true,
 	menuOpened: false
 })
 
@@ -346,6 +346,7 @@ async function getUrlContent(url, customUrl) {
 		fixRating(page.menu)
 
 		if (page.system?.setContent === 'movies') page.menu = page.menu.filter((item, index, arr) => arr.findIndex(x => (x.id || x.url) === (item.id || item.url)) === index)
+		else if (page.system?.setContent === 'episodes') page.menu = page.menu.filter((item, index, arr) => arr.findIndex(x => x.url === item.url) === index)
 
 		page.menu = page.menu.filter(l => !['nextep', 'last'].includes(l.action))
 
@@ -460,6 +461,12 @@ async function showDownload(link) {
 	try {
 		const data = await getProxyData(`${PLUGIN_URL}/${link.url}${link.url.includes('?') ? '&' : '?'}${getQueryParams()}`)
 
+		if (data.strms?.length) {
+			data.strms.map(stream => {
+				stream.realSize = stream.size.includes('GB') ? parseFloat(stream.size)*1000 : parseFloat(stream.size)
+			})
+			data.strms.sort((a, b) => b.realSize - a.realSize)
+		}
 		downloadStreams.data = data
 		downloadStreams.loading = false
 	} catch (error) {
@@ -697,7 +704,7 @@ function findNextFocusableItem(down, num = 1, limit = false) {
 	let currentIndex = focusableEls.findIndex(el => el.classList.contains('isCurrent'))
 
 	if (currentItem && ['.dirLink', '.postersGrid .poster'].some(i => currentItem.matches(i)) && num == 1 && ((!down && currentIndex > 0) || (down && currentIndex + 1 < focusableEls.length))) {
-		num = parseInt(currentItem.parentNode.clientWidth / currentItem.clientWidth)
+		num = theme.value == 'v2' && currentItem.matches('.dirLink') ? 100 : parseInt(currentItem.parentNode.clientWidth / currentItem.clientWidth)
 		let nextLREl
 		if (down) nextLREl = focusableEls.findIndex((e, i) => (e.classList.contains('posters-cont') || e.matches('.dirLinks > .dirLink:first-child')) && i > currentIndex)
 		else nextLREl = focusableEls.findLastIndex((e, i) => e.classList.contains('posters-cont') && i < currentIndex)
@@ -756,8 +763,11 @@ function scrollCurrent(behavior = 'smooth') {
 }
 
 // movie DB Sites
-function showMovieDBSite(site, id) {
+function showMovieDBSite(site, id, link) {
 	if (!site || !id) return
+
+	if (link && link.url != currentItemInfo.value.url) setCurrentItemInfo(link)
+
 	if (site == 'csfd') {
 		csfdFrame.src = `https://www.csfd.${navigator.language.startsWith('sk') ? 'sk' : 'cz'}/film/${id}`
 		csfdFrame.show = true
@@ -783,10 +793,7 @@ function destroyTrailer() {
 onBeforeMount(() => {
 	runUpdater()
 
-	if (tokenDate.value && (Date.now() - tokenDate.value > 86400000)) {
-		logout()
-		appState.autoLogin = true
-	} else if (token.value) getHomePage(false, true)
+	onInit()
 
 	window.addEventListener('beforeinstallprompt', (e) => {
 		e.preventDefault()
@@ -801,7 +808,6 @@ onBeforeUnmount(() => {
 })
 function logout() {
 	token.value = ''
-	tokenDate.value = ''
 	downloadToken.value = ''
 	customHistory.value.length = 1
 }
@@ -825,14 +831,10 @@ async function getToken() {
 
 				const newDownloadToken = await getDownloadToken(response.session_id)
 
-				if (newDownloadToken == false) {
-					appState.isLogging = false
-					appState.loginError = 'Unable to get download token'
-				} else {
-					appState.isLogging = false
+				if (newDownloadToken == false) appState.loginError = 'Unable to get download token'
+				else {
 					token.value = response.session_id
 					downloadToken.value = newDownloadToken
-					tokenDate.value = Date.now()
 
 					getHomePage(false, true)
 
@@ -840,12 +842,13 @@ async function getToken() {
 					appState.krPass = ''
 					appState.krRemember = false
 				}
-			} else if (response.msg) {
-				appState.isLogging = false
-				appState.loginError = response.msg
-			}
+			} else if (response.msg) appState.loginError = response.msg
 		})
 		.catch(err => console.error(err))
+		.finally(() => {
+			appState.isLogging = false
+			if (appState.initLoad) appState.initLoad = false
+		})
 }
 
 function saveTokenInfoB() {
@@ -880,10 +883,14 @@ async function getDownloadToken(session_id) {
 
 		if (!fileDownloadJSON?.data?.link) return false
 
+		const newLink = fileDownloadJSON.data.link.replace(/:\/\/(.{1,2}\d{2})\./, "://b01.")
+
 		const tokenData = await fetch(`${DOWNLOAD_SERVICE_URL}/getTokenContent.php`, {
 			method: 'POST',
-			body: new URLSearchParams({ url: fileDownloadJSON.data.link })
+			body: new URLSearchParams({ url: newLink })
 		})
+		if (tokenData.status != 200) return false
+
 		const tokenDataTEXT = await tokenData.text()
 
 		if (!tokenDataTEXT) return false
@@ -895,19 +902,32 @@ async function getDownloadToken(session_id) {
 	}
 }
 
-async function onInterfaceEnter() {
-	if (appState.autoLogin && !token.value) {
-		appState.autoLogin = false
+async function onInit() {
+	if (token.value) {
+		const userInfoData = await fetch(`${SERVICE_URL}/user/info`, {
+			method: 'POST',
+			headers: {'Content-Type': 'application/json'},
+			body: `{"session_id": "${token.value}"}`
+		})
+		const userInfoDataJSON = await userInfoData.json()
 
-		const lsData = getLSTokenInfoB()
-		if (!lsData?.usr || !lsData?.pass) return
-
-		appState.krUser = lsData.usr
-		appState.krPass = lsData.pass
-		appState.krRemember = true
-
-		getToken()
+		if (userInfoDataJSON?.data?.days_left > 0) {
+			appState.initLoad = false
+			return getHomePage(false, true)
+		} else logout()
 	}
+
+	const lsData = getLSTokenInfoB()
+	if (!lsData?.usr || !lsData?.pass) {
+		appState.initLoad = false
+		return
+	}
+
+	appState.krUser = lsData.usr
+	appState.krPass = lsData.pass
+	appState.krRemember = true
+
+	getToken()
 }
 
 // video info
@@ -925,27 +945,15 @@ function setCurrentItemInfo(link, scrollToItem) {
 	}
 }
 function showCurrentItemInfo(link) {
+	if (link && link.url != currentItemInfo.value?.url) setCurrentItemInfo(link)
 	if (['next', 'back'].includes(currentItemInfo.value?.type) || !currentItemInfo.value?.info || showInfoModal.value || !currentItemInfo.value?.i18n_art || ignoreMouseEnter) return
-	if (link && link.url != currentItemInfo.value.url) setCurrentItemInfo(link)
 	showInfoModal.value = true
 }
 
 // info grid layout functions
-let gridMouseEnterTimeout = null
-function onMouseLeaveGrid(e) {
-	if (gridMouseEnterTimeout) clearTimeout(gridMouseEnterTimeout)
-	e.target.classList.remove('loadingInfo')
-}
 function setCurrentItemInfoGrid(e, link) {
-	if (videoLayout.value == 'infoGrid' && e.pointerType == 'mouse') {
-		if (gridMouseEnterTimeout) clearTimeout(gridMouseEnterTimeout)
-		if (e.target.classList.contains('isCurrent')) return
-		gridMouseEnterTimeout = setTimeout(() => {
-			if (!document.documentElement.contains(e.target)) return
-			setCurrentItemInfo(link)
-		}, 1500)
-		e.target.classList.add('loadingInfo')
-	} else setCurrentItemInfo(link)
+	if (videoLayout.value == 'infoGrid' && e.pointerType == 'mouse') return
+	else setCurrentItemInfo(link)
 }
 
 // helpers
@@ -968,6 +976,9 @@ function runUpdater() {
 		if (generatorShows.value.includes("3903")) generatorShows.value.push("68191")
 		generatorShows.value = generatorShows.value.filter(id => !["3744", "3903"].includes(id))
 	}
+
+	// Update 10/25
+	if (localStorage.getItem('tokenDate')) localStorage.removeItem('tokenDate')
 }
 function getCurrentFocusableItem() {
 	return mainEl.value.querySelector('.isCurrentLR') || mainEl.value.querySelector('.isCurrent')
@@ -1105,9 +1116,12 @@ function startIgnoringEvents(e) {
 
 // theme
 watch(theme, () => {
-	if (theme.value == 'light') document.querySelector('meta[name="theme-color"]').setAttribute('content', 'hsl(193, 40%, 92%)');
+	if (theme.value == 'v2') document.querySelector('meta[name="theme-color"]').setAttribute('content', '#032829');
+	else if (theme.value == 'light') document.querySelector('meta[name="theme-color"]').setAttribute('content', 'hsl(193, 40%, 92%)');
 	else if (theme.value == 'dark') document.querySelector('meta[name="theme-color"]').setAttribute('content', 'hsl(193, 40%, 10%)');
 	else document.querySelector('meta[name="theme-color"]').setAttribute('content', window.matchMedia('(prefers-color-scheme: light)').matches ? 'hsl(193, 40%, 92%)' : 'hsl(193, 40%, 10%)');
+
+	document.documentElement.classList.toggle('theme-v2', theme.value == 'v2')
 	document.documentElement.classList.toggle('theme-dark', theme.value == 'dark')
 	document.documentElement.classList.toggle('theme-light', theme.value == 'light')
 })
@@ -1122,8 +1136,13 @@ function afterImport() {
 </script>
 
 <template>
-	<Transition appear name="layout" mode="out-in" @afterEnter="onInterfaceEnter">
-		<div v-if="token" class="layout" :class="appState.menuOpened ? 'menuOpened' : 'menuClosed'" @keydown="startIgnoringEvents" @mousemove="ignoreMouseEvents && (ignoreMouseEvents = false)">
+	<Transition appear name="layout" mode="out-in">
+		<div v-if="appState.initLoad" class="loginScreen">
+			<div class="loader" key="loader">
+				<i class="fa-solid fa-spinner fa-spin-pulse fa-5x"></i>
+			</div>
+		</div>
+		<div v-else-if="token" class="layout" :class="appState.menuOpened ? 'menuOpened' : 'menuClosed'" @keydown="startIgnoringEvents" @mousemove="ignoreMouseEvents && (ignoreMouseEvents = false)">
 			<div class="menu-backdrop" @click.self="appState.menuOpened = false"></div>
 			<aside class="menu">
 				<a class="logo-link flex ai-c" href="/" @click.prevent="currentHistoryIndex > 0 ? windowHistory.go(-currentHistoryIndex) : getHomePage(true)">
@@ -1135,8 +1154,7 @@ function afterImport() {
 				</a>
 				<div class="menu-items">
 					<MenuLink href="/" icon="fa-solid fa-home" :title="t('Home')" :isActive="currentPage?.type == 'home'" @click.prevent="currentHistoryIndex > 0 ? windowHistory.go(-currentHistoryIndex) : getHomePage(true)" />
-					<MenuLink icon="fa-solid fa-search" :title="t('Search')" @click.prevent="showSearch" />
-					<MenuLink v-for="link in homepageLinks['menu']" :icon="link.icon" :title="link.i18n_info[lang].title" :isActive="(link.action && currentPage?.type == link.action) || (link.url && currentPage?.url?.startsWith(link.url)) || (link.id == 'series' && ['seasons', 'episodes'].includes(currentPage?.data?.system?.setContent))" @click.prevent="visitLinkFromHome(link)" />
+					<MenuLink v-for="link in homepageLinks['menu']" :icon="link.icon" :title="link.i18n_info[lang].title" :isActive="(link.action && currentPage?.type == link.action) || (link.activeURLs && link.activeURLs?.some(u => currentPage?.url?.includes(u))) || (link.url && currentPage?.url?.startsWith(link.url)) || (link.id == 'series' && ['seasons', 'episodes'].includes(currentPage?.data?.system?.setContent))" @click.prevent="visitLinkFromHome(link)" />
 				</div>
 				<div class="menu-items">
 					<MenuLink v-if="installPrompt || iOsInstallPrompt" icon="fa-solid fa-cloud-arrow-down" :title="t('Download App')" @click.prevent="installApp" />
@@ -1147,10 +1165,6 @@ function afterImport() {
 				</div>
 			</aside>
 			<header class="flex ai-c header" :tabindex="isIOS ? '-1' : null">
-				<a class="logo logo-desktop" href="/" @click.prevent="currentHistoryIndex > 0 ? windowHistory.go(-currentHistoryIndex) : getHomePage(true)">
-					<svg viewBox="0 0 36 36" xmlns="http://www.w3.org/2000/svg" version="1.1" fill="#2ebc4f"><path d="M 0 18 C 0 0, 0 0, 18 0 S 36 0, 36 18, 36 36 18 36, 0 36, 0 18" transform="rotate(0, 18, 18) translate(0, 0)"></path></svg>
-					<i class="fa-solid fa-circle-play"></i>
-				</a>
 				<BButton dark smaller icon="fa-solid fa-bars" class="buttonUnstyled collapseMenu-toggle" @click.prevent="appState.menuOpened = !appState.menuOpened"  :title="t(appState.menuOpened ? 'Collapse menu' : 'Expand menu')" />
 				<div class="pageTitle flex ai-c">
 					<BButton dark smaller icon="fa-solid fa-angle-left" class="buttonUnstyled" :disabled="currentPage?.type == 'home'" @click.prevent="windowHistory.go(-1)" :title="t('Back')" />
@@ -1177,7 +1191,7 @@ function afterImport() {
 					</Transition>
 				</div>
 				<div class="header-buttons-outer flex">
-					<BButton dark smaller icon="fa-solid fa-ellipsis-vertical" class="header-more buttonUnstyled" :title="t('Menu')" @click="$event.target.closest('button')?.focus()" @focus="null" />
+					<BButton dark smaller icon="fa-solid fa-ellipsis" class="header-more buttonUnstyled" :title="t('Menu')" @click="$event.target.closest('button')?.focus()" @focus="null" />
 					<div class="header-buttons flex ai-c">
 						<BButton dark smaller class="buttonUnstyled" :class="{isSorted: currentPage?.sortBy}" icon="fa-solid fa-arrow-down-short-wide" :disabled="!['movies', 'tvshows'].includes(currentPage?.data?.system?.setContent)" @click.prevent="showCurrentSortModal = true" :title="t('List sort')" />
 						<BButton dark smaller class="buttonUnstyled" icon="fa-solid fa-table-cells" @click.prevent="showLayoutSelectModal = true" :title="t('Layout')" :disabled="!['movies', 'tvshows', 'episodes', 'seasons'].includes(currentPage?.data?.system?.setContent)" />
@@ -1185,7 +1199,6 @@ function afterImport() {
 						<BButton dark smaller class="buttonUnstyled" icon="fa-solid fa-rotate-right" @click.prevent="refreshPage" :title="t('Refresh page')" />
 						<BButton dark smaller class="buttonUnstyled" icon="fa-solid fa-search" :title="t('Search')" @click="showSearch" />
 						<BButton v-if="gCastConnected" dark smaller class="buttonUnstyled isSorted" icon="fa-brands fa-chromecast" :title="t('Disconnect device')" @click="disconnectGCast" />
-						<BButton v-if="installPrompt || iOsInstallPrompt" class="buttonUnstyled" dark smaller icon="fa-solid fa-cloud-arrow-down" :title="t('Download App')" @click.prevent="installApp" />
 					</div>
 				</div>
 			</header>
@@ -1195,7 +1208,7 @@ function afterImport() {
 						<i class="fa-solid fa-spinner fa-spin-pulse fa-5x"></i>
 					</div>
 					<div v-else-if="currentPage?.data?.system?.setContent == 'files'" class="dirPage scroller" :key="currentPage.id">
-						<div v-if="currentPage?.type != 'home' || hpWidgets.includes('menu')" class="dirLinks">
+						<div v-if="currentPage?.type != 'home' || hpWidgets.includes('menu')" class="dirLinks" :class="{'v2-mScrollable': currentPage?.type == 'home' && hpWidgets.includes('menu')}">
 							<div v-if="currentPage?.type != 'home' && showBackItem" class="dirLink isFocusable" :class="{isCurrent: currentItemInfo && currentItemInfo.type == 'back'}" @click.prevent="windowHistory.go(-1)" @pointerenter="!ignoreMouseEvents && setCurrentItemInfo({type: 'back'})" @itementer="setCurrentItemInfo({type: 'back'}, true)">
 								<div class="dirLink-title"><i class="fa-solid fa-angle-left fa-fw"></i> {{ t('Back') }}</div>
 							</div>
@@ -1205,7 +1218,7 @@ function afterImport() {
 								</div>
 							</template>
 						</div>
-						<div v-if="currentPage?.type == 'home' && bookmarks.length" class="dirLinks divided">
+						<div v-if="currentPage?.type == 'home' && bookmarks.length" class="dirLinks divided v2-mScrollable">
 							<template v-for="link in bookmarks">
 								<div class="dirLink isFocusable" :class="{isCurrent: currentItemInfo && ((currentItemInfo.url && currentItemInfo.url == link.url) || (currentItemInfo.id && currentItemInfo.id == link.id))}" @click.prevent="visitLink(link)" @pointerenter="!ignoreMouseEvents && setCurrentItemInfo(link)" @itementer="setCurrentItemInfo(link, true)">
 									<div class="dirLink-title" v-html="reformatString(link.title[lang])"></div>
@@ -1221,6 +1234,7 @@ function afterImport() {
 								@removeFromDownloadHistory="removeFromDownloadHistory"
 								@visitLink="visitLink"
 								@showCurrentItemInfo="showCurrentItemInfo"
+								@showMovieDBSite="showMovieDBSite"
 							/>
 						</template>
 						<template v-else-if="currentPage?.url == '/FMovies'" class="homeWidgets">
@@ -1232,6 +1246,7 @@ function afterImport() {
 								@removeFromDownloadHistory="removeFromDownloadHistory"
 								@visitLink="visitLink"
 								@showCurrentItemInfo="showCurrentItemInfo"
+								@showMovieDBSite="showMovieDBSite"
 							/>
 							<HomeWidget
 								id="favs"
@@ -1242,6 +1257,7 @@ function afterImport() {
 								@removeFromDownloadHistory="removeFromDownloadHistory"
 								@visitLink="visitLink"
 								@showCurrentItemInfo="showCurrentItemInfo"
+								@showMovieDBSite="showMovieDBSite"
 							/>
 						</template>
 						<template v-else-if="currentPage?.url == '/FSeries'" class="homeWidgets">
@@ -1253,6 +1269,7 @@ function afterImport() {
 								@removeFromDownloadHistory="removeFromDownloadHistory"
 								@visitLink="visitLink"
 								@showCurrentItemInfo="showCurrentItemInfo"
+								@showMovieDBSite="showMovieDBSite"
 							/>
 							<HomeWidget
 								id="favs"
@@ -1263,13 +1280,14 @@ function afterImport() {
 								@removeFromDownloadHistory="removeFromDownloadHistory"
 								@visitLink="visitLink"
 								@showCurrentItemInfo="showCurrentItemInfo"
+								@showMovieDBSite="showMovieDBSite"
 							/>
 						</template>
 					</div>
 					<div v-else-if="['movies', 'tvshows', 'episodes', 'seasons'].includes(currentPage?.data?.system?.setContent)" class="moviesPage" :class="`libraryLayout-${videoLayout}`" :key="`i-${currentPage.ts}`">
 						<div v-if="['grid', 'infoGrid'].includes(videoLayout)" class="dirPage scroller posters-contOuter">
 							<div class="posters-cont postersGrid">
-								<div v-if="customHistory.length && showBackItem" class="poster isFocusable" :class="{isCurrent: currentItemInfo && currentItemInfo.type == 'back', isHoverable: videoLayout == 'infoGrid'}" @click.prevent="windowHistory.go(-1)" @pointerenter="(e) => !ignoreMouseEvents && setCurrentItemInfoGrid(e, {type: 'back'})" @itementer="setCurrentItemInfo({type: 'back'}, true)" @mouseleave="onMouseLeaveGrid">
+								<div v-if="customHistory.length && showBackItem" class="poster isFocusable" :class="{isCurrent: currentItemInfo && currentItemInfo.type == 'back', isHoverable: videoLayout == 'infoGrid'}" @click.prevent="windowHistory.go(-1)" @pointerenter="(e) => !ignoreMouseEvents && setCurrentItemInfoGrid(e, {type: 'back'})" @itementer="setCurrentItemInfo({type: 'back'}, true)">
 									<div class="poster-imgCont" :class="{'poster-imgCont-ep': currentPage?.data?.system?.setContent == 'episodes'}">
 										<span class="poster-icon flex ai-c jc-c">
 											<i class="fa-solid fa-angle-left fa-fw"></i>
@@ -1279,7 +1297,7 @@ function afterImport() {
 										<div class="poster-title">{{ t('Back') }}</div>
 									</div>
 								</div>
-								<div v-for="link in currentPage.data.sortedMenu" class="poster isFocusable" :class="{isCurrent: currentItemInfo && currentItemInfo.url == link.url, isHoverable: videoLayout == 'infoGrid'}" @click="showDownload(link)" @pointerenter="(e) => !ignoreMouseEvents && setCurrentItemInfoGrid(e, link)" @itementer="setCurrentItemInfo(link, true)" @mouseleave="onMouseLeaveGrid">
+								<div v-for="link in currentPage.data.sortedMenu" class="poster isFocusable" :class="{isCurrent: currentItemInfo && currentItemInfo.url == link.url, isHoverable: videoLayout == 'infoGrid'}" @click="showDownload(link)" @pointerenter="(e) => !ignoreMouseEvents && setCurrentItemInfoGrid(e, link)" @itementer="setCurrentItemInfo(link, true)">
 									<div class="poster-imgCont" :class="{'poster-imgCont-ep': currentPage?.data?.system?.setContent == 'episodes'}">
 										<span v-if="link.type == 'next'" class="poster-icon flex ai-c jc-c">
 											<i class="fa-solid fa-angle-right fa-fw"></i>
@@ -1287,8 +1305,9 @@ function afterImport() {
 										<img v-else-if="currentPage?.data?.system?.setContent == 'episodes' && link?.i18n_art?.[lang]?.thumb" :src="link?.i18n_art?.[lang]?.thumb" class="poster-img" />
 										<img v-else-if="(link?.i18n_art?.[lang]?.poster && !link?.i18n_art?.[lang]?.poster?.endsWith('.gif')) || link?.poster" :src="link?.i18n_art?.[lang]?.poster || link?.poster" class="poster-img" loading="lazy" />
 										<img v-else :src="DEFAULT_POSTER" class="poster-img" loading="lazy" />
-										<div v-if="link?.info?.rating" class="movieInfo-rating" :class="{isAverage: link?.info?.rating < 7.5 && link?.info?.rating > 4, isBad: link?.info?.	rating <= 4}">{{ link?.info?.rating }}</div>
-										<BButton  v-if="link.type != 'next'" class="posterButton-info" icon="fa-solid fa-info" @click.stop="link?.url != currentItemInfo?.url ? setCurrentItemInfo(link) : showCurrentItemInfo(link)" />
+										<button v-if="link?.info?.rating" class="movieInfo-rating movieInfo-rating-button" :class="{isAverage: link?.info?.rating < 7.5 && link?.info?.rating > 4, isBad: link?.info?.	rating <= 4}" @click.stop="showMovieDBSite('csfd', link.unique_ids?.csfd || null, link)">{{ link?.info?.rating }}</button>
+										<BButton  v-if="link.type != 'next'" class="posterButton-info" :class="{'movieLink-mobileLi-mobile': videoLayout == 'infoGrid'}" icon="fa-solid fa-info" @click.stop="showCurrentItemInfo(link)" />
+										<BButton  v-if="videoLayout == 'infoGrid' && link.type != 'next'" class="posterButton-info movieLink-mobileLi-tabled" icon="fa-solid fa-info" @click.stop="link?.url != currentItemInfo?.url ? setCurrentItemInfo(link) : false" />
 										<i v-if="link.id && ['movies', 'tvshows'].includes(currentPage?.data?.system?.setContent) && favItems.some(fav => fav.id == link.id)" class="poster-loved fa-solid fa-heart"></i>
 										<i v-if="link?.type == 'video' && link?.url && downloadHistory.includes(link.url.split('?')[0])" class="poster-viewed fa-solid fa-check"></i>
 										<i v-else-if="currentPage?.data?.system?.setContent == 'seasons' && link?.url && downloadHistory.some(hitem => hitem.includes(`/Play/${link?.id}/${link?.info?.season}/`))" class="poster-viewed fa-solid fa-check"></i>
@@ -1381,16 +1400,12 @@ function afterImport() {
 				</Transition>
 			</main>
 			<aside class="mobileNav flex">
-				<div class="mobileNav-link" @click.prevent="appState.menuOpened = true">
-					<i class="fa-solid fa-bars mobileNav-icon"></i>
-					<div class="mobileNav-title">Menu</div>
-				</div>
 				<div class="mobileNav-link" :class="{isActive: currentPage?.id == 'home'}" @click.prevent="currentHistoryIndex > 0 ? windowHistory.go(-currentHistoryIndex) : getHomePage(true)">
 					<i class="fa-solid fa-home mobileNav-icon"></i>
 					<div class="mobileNav-title">{{ t('Home') }}</div>
 				</div>
 				<div class="mobileNav-link" :class="{isActive: currentPage?.url?.startsWith('/FMovies') || currentPage?.data?.system?.setContent == 'movies'}" @click.prevent="visitLinkFromHome(homepageLinks.menu[0])">
-					<i class="fa-solid fa-video mobileNav-icon"></i>
+					<i class="fa-solid fa-film mobileNav-icon"></i>
 					<div class="mobileNav-title">{{ t('Movies') }}</div>
 				</div>
 				<div class="mobileNav-link" :class="{isActive: !isGeneratorSubpage && (currentPage?.url?.startsWith('/FSeries') || ['seasons', 'episodes'].includes(currentPage?.data?.system?.setContent))}" @click.prevent="visitLinkFromHome(homepageLinks.menu[1])">
@@ -1419,7 +1434,7 @@ function afterImport() {
 					</div>
 				</div>
 			</Transition>
-			<BModal v-model:open="searchData.show" narrow :title="searchData.type ? `${t('Search')} ${searchIdMap[searchData.type]?.[lang]}` : t('Search')">
+			<BModal v-model:open="searchData.show" narrow :title="searchData.type ? `${t('Search')} ${searchIdMap[searchData.type]?.[lang]}` : t('Search')" class="modal-ns">
 				<form class="searchCont">
 					<label class="blockLabel line">
 						<input ref="searchInputEl" class="input autofocus isFull" :placeholder="t('Search text...')" v-model="searchData.model" required />
@@ -1474,9 +1489,11 @@ function afterImport() {
 				</Transition>
 				<div v-if="downloadStreams.loading" class="modal-loader"><i class="fa-solid fa-spinner fa-spin-pulse fa-3x"></i></div>
 				<div v-else>
-					<DownloadLink v-for="streamLink in downloadStreams.data.strms" :loading="downloadStreams.loadingLink == streamLink.url" class="isFocusable" :link="streamLink" :isSupportedOs :isDesktopOs :current="downloadStreams.current?.url == streamLink.url" @downloadFile="downloadFile" @copyFileLink="copyFileLink" @pointerenter="!ignoreMouseEvents && (downloadStreams.current = streamLink)">
-						<strong>{{ streamLink.size }}</strong> - {{ streamLink.quality }} <span class="light"><span class="downloadModal-streamInfoPC">{{ streamLink.vinfo }}{{ streamLink.ainfo }}</span><span class="downloadModal-streamInfoMobile">{{ streamLink.linfo?.join(', ').toUpperCase() }}</span></span>
-					</DownloadLink>
+					<div class="modalDownloadLinks">
+						<DownloadLink v-for="streamLink in downloadStreams.data.strms" :loading="downloadStreams.loadingLink == streamLink.url" class="isFocusable" :link="streamLink" :isSupportedOs :isDesktopOs :current="downloadStreams.current?.url == streamLink.url" @downloadFile="downloadFile" @copyFileLink="copyFileLink" @pointerenter="!ignoreMouseEvents && (downloadStreams.current = streamLink)">
+							<strong>{{ streamLink.size }}</strong> - {{ streamLink.quality }} <span class="light"><span class="downloadModal-streamInfoPC">{{ streamLink.vinfo }}{{ streamLink.ainfo }}</span><span class="downloadModal-streamInfoMobile">{{ streamLink.linfo?.join(', ').toUpperCase() }}</span></span>
+						</DownloadLink>
+					</div>
 					<div class="downloadModal-episodeInfo flex ai-c">
 						<div class="downloadModal-episodeTitle">
 							<template v-if="currentPage?.data?.system?.setContent == 'episodes'">
@@ -1494,40 +1511,44 @@ function afterImport() {
 				</div>
 			</BModal>
 			<BModal v-model:open="showCurrentSortModal" narrow :title="t('List sort')">
-				<div class="downloadModal-link flex ai-c isHoverable" :class="{isActive: !currentPage.sortBy}" @click="setCurrentSortBy('')">
-					<div class="downloadModal-linkTitle flex ai-c">{{ t('Default') }}</div>
-				</div>
-				<div class="downloadModal-link flex ai-c isHoverable" :class="{isActive: currentPage?.sortBy == 'rating'}" @click="setCurrentSortBy('rating')">
-					<div class="downloadModal-linkTitle flex ai-c">{{ t('Rating') }}</div>
-				</div>
-				<div class="downloadModal-link flex ai-c isHoverable" :class="{isActive: currentPage?.sortBy == 'newest'}" @click="setCurrentSortBy('newest')">
-					<div class="downloadModal-linkTitle flex ai-c">{{ t('Newest') }}</div>
-				</div>
-				<div class="downloadModal-link flex ai-c isHoverable" :class="{isActive: currentPage?.sortBy == 'oldest'}" @click="setCurrentSortBy('oldest')">
-					<div class="downloadModal-linkTitle flex ai-c">{{ t('Oldest') }}</div>
-				</div>
-				<div class="downloadModal-link flex ai-c isHoverable" :class="{isActive: currentPage?.sortBy == 'longest'}" @click="setCurrentSortBy('longest')">
-					<div class="downloadModal-linkTitle flex ai-c">{{ t('Longest') }}</div>
-				</div>
-				<div class="downloadModal-link flex ai-c isHoverable" :class="{isActive: currentPage?.sortBy == 'shortest'}" @click="setCurrentSortBy('shortest')">
-					<div class="downloadModal-linkTitle flex ai-c">{{ t('Shortest') }}</div>
+				<div class="modalDownloadLinks">
+					<div class="downloadModal-link flex ai-c isHoverable" :class="{isActive: !currentPage.sortBy}" @click="setCurrentSortBy('')">
+						<div class="downloadModal-linkTitle flex ai-c">{{ t('Default') }}</div>
+					</div>
+					<div class="downloadModal-link flex ai-c isHoverable" :class="{isActive: currentPage?.sortBy == 'rating'}" @click="setCurrentSortBy('rating')">
+						<div class="downloadModal-linkTitle flex ai-c">{{ t('Rating') }}</div>
+					</div>
+					<div class="downloadModal-link flex ai-c isHoverable" :class="{isActive: currentPage?.sortBy == 'newest'}" @click="setCurrentSortBy('newest')">
+						<div class="downloadModal-linkTitle flex ai-c">{{ t('Newest') }}</div>
+					</div>
+					<div class="downloadModal-link flex ai-c isHoverable" :class="{isActive: currentPage?.sortBy == 'oldest'}" @click="setCurrentSortBy('oldest')">
+						<div class="downloadModal-linkTitle flex ai-c">{{ t('Oldest') }}</div>
+					</div>
+					<div class="downloadModal-link flex ai-c isHoverable" :class="{isActive: currentPage?.sortBy == 'longest'}" @click="setCurrentSortBy('longest')">
+						<div class="downloadModal-linkTitle flex ai-c">{{ t('Longest') }}</div>
+					</div>
+					<div class="downloadModal-link flex ai-c isHoverable" :class="{isActive: currentPage?.sortBy == 'shortest'}" @click="setCurrentSortBy('shortest')">
+						<div class="downloadModal-linkTitle flex ai-c">{{ t('Shortest') }}</div>
+					</div>
 				</div>
 			</BModal>
 			<BModal v-model:open="showLayoutSelectModal" narrow :title="t('Layout')">
-				<div class="downloadModal-link flex ai-c isHoverable" :class="{isActive: videoLayout == 'listLeft'}" @click="videoLayout = 'listLeft'">
-					<div class="downloadModal-linkTitle flex ai-c">{{ t('List left') }}</div>
-				</div>
-				<div class="downloadModal-link flex ai-c isHoverable" :class="{isActive: videoLayout == 'listRight'}" @click="videoLayout = 'listRight'">
-					<div class="downloadModal-linkTitle flex ai-c">{{ t('List right') }}</div>
-				</div>
-				<div class="downloadModal-link flex ai-c isHoverable" :class="{isActive: videoLayout == 'grid'}" @click="videoLayout = 'grid'">
-					<div class="downloadModal-linkTitle flex ai-c">{{ t('Grid') }}</div>
-				</div>
-				<div class="downloadModal-link flex ai-c isHoverable" :class="{isActive: videoLayout == 'infoGrid'}" @click="videoLayout = 'infoGrid'">
-					<div class="downloadModal-linkTitle flex ai-c">{{ t('Grid with info') }}</div>
+				<div class="modalDownloadLinks">
+					<div class="downloadModal-link flex ai-c isHoverable" :class="{isActive: videoLayout == 'listLeft'}" @click="videoLayout = 'listLeft'">
+						<div class="downloadModal-linkTitle flex ai-c">{{ t('List left') }}</div>
+					</div>
+					<div class="downloadModal-link flex ai-c isHoverable" :class="{isActive: videoLayout == 'listRight'}" @click="videoLayout = 'listRight'">
+						<div class="downloadModal-linkTitle flex ai-c">{{ t('List right') }}</div>
+					</div>
+					<div class="downloadModal-link flex ai-c isHoverable" :class="{isActive: videoLayout == 'grid'}" @click="videoLayout = 'grid'">
+						<div class="downloadModal-linkTitle flex ai-c">{{ t('Grid') }}</div>
+					</div>
+					<div class="downloadModal-link flex ai-c isHoverable" :class="{isActive: videoLayout == 'infoGrid'}" @click="videoLayout = 'infoGrid'">
+						<div class="downloadModal-linkTitle flex ai-c">{{ t('Grid with info') }}</div>
+					</div>
 				</div>
 			</BModal>
-			<BModal v-model:open="searchData.genreSearchShow" narrow :title="`${t('Search')} ${searchIdMap['by-genre'][lang]}`">
+			<BModal v-model:open="searchData.genreSearchShow" narrow :title="`${t('Search')} ${searchIdMap['by-genre'][lang]}`" class="modal-ns">
 				<form class="searchCont" @submit.prevent="doSearchByGenre">
 					<div class="blockLabel baseLine">
 						<span class="blockLabel-label">{{ t('Type') }}</span>
@@ -1584,16 +1605,16 @@ function afterImport() {
 					<BButton class="baseLine" full icon="fa-solid fa-magnifying-glass" type="submit">{{ t('Search') }}</BButton>
 				</form>
 			</BModal>
-			<BModal v-model:open="showSettingsModal" narrow :title="t('Settings')">
+			<BModal v-model:open="showSettingsModal" narrow :title="t('Settings')" class="modal-ns">
 				<AppSettings :isWindows :isAndroid :isIOS @afterImport="afterImport" />
 			</BModal>
-			<BModal v-model:open="showHelpModal" narrow :title="t('Help')">
+			<BModal v-model:open="showHelpModal" narrow :title="t('Help')" class="modal-ns">
 				<HelpModalContent />
 			</BModal>
-			<BModal v-model:open="showSyncModal" narrow :title="t('Synchronization')">
+			<BModal v-model:open="showSyncModal" narrow :title="t('Synchronization')" class="modal-ns">
 				<SyncModalContent @afterSync="afterImport" />
 			</BModal>
-			<BModal v-if="iOsInstallPrompt" v-model:open="iOsInstallHelper" narrow :title="t('Download App')">
+			<BModal v-if="iOsInstallPrompt" v-model:open="iOsInstallHelper" narrow :title="t('Download App')" class="modal-ns">
 				<div class="searchCont">
 					<div>
 						<div>{{ t('1. Press the "Share" button') }}</div>
@@ -1631,7 +1652,7 @@ function afterImport() {
 					<label class="blockLabel line">
 						<input class="input isFull" type="password" v-model="appState.krPass" :placeholder="t('Password')" required>
 					</label>
-					<label v-if="isStandalone" class="chGroup-label line">
+					<label class="chGroup-label line">
 						<input type="checkbox" class="cbGroup-cb" v-model="appState.krRemember" />
 						<span class="cbGroup-title">{{ t('Remember me') }}</span>
 					</label>

@@ -4,7 +4,10 @@ import { createApp } from 'vue'
 import App from './App.vue'
 
 const localStorageTheme = JSON.parse(localStorage.getItem('theme'))
-if (localStorageTheme == 'light') {
+if (localStorageTheme == 'v2') {
+	document.documentElement.classList.add('theme-v2');
+	document.querySelector('meta[name="theme-color"]').setAttribute('content', '#032829');
+} else if (localStorageTheme == 'light') {
 	document.documentElement.classList.add('theme-light');
 	document.querySelector('meta[name="theme-color"]').setAttribute('content', 'hsl(193, 40%, 92%)');
 } else if (localStorageTheme == 'dark') {
