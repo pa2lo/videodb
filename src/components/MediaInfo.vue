@@ -1,5 +1,6 @@
 <script setup>
 import { computed, onBeforeUnmount } from 'vue'
+import { formatHMS } from '@/helpers'
 
 import { t } from '@/labels'
 
@@ -91,7 +92,7 @@ const showPoster = computed(() => {
 			<span v-if="currentItemInfo.info.year" class="movieInfo-year">{{ currentItemInfo.info.year }}</span>
 			<span v-if="currentItemInfo.stream_info.langs" class="movieInfo-country">{{ Object.keys(currentItemInfo.stream_info.langs).slice(0, 3).join(', ') }}</span>
 			<span v-if="currentItemInfo.i18n_info[lang].country" class="movieInfo-country">{{ currentItemInfo.i18n_info[lang].country.join(', ') }}</span>
-			<span v-if="currentItemInfo.stream_info.video.duration" class="movieInfo-year">{{ currentItemInfo.stream_info.video.duration > 3600 ? new Date(currentItemInfo.stream_info.video.duration * 1000).toISOString().substring(11, 19) : new Date(currentItemInfo.stream_info.video.duration * 1000).toISOString().substring(14, 19) }}</span>
+			<span v-if="currentItemInfo.stream_info.video.duration" class="movieInfo-year">{{ formatHMS(currentItemInfo.stream_info.video.duration) }}</span>
 		</div>
 		<div v-if="currentItemInfo.i18n_info[lang].plot" class="movieInfo-plot">{{ currentItemInfo.i18n_info[lang].plot }}</div>
 		<div v-if="currentItemInfo.info?.director?.length || currentItemInfo.cast?.length" class="movieInfo-cast">

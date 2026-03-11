@@ -43,6 +43,8 @@ export function getQueryParams() {
 		DV: incDV.value,
 		HDR: incHDR.value,
 		lang: lang.value,
+		old: 1,
+		skin: 'skin.estuary.stream-cinema.matrix',
 		uid: uid.value,
 		ver: '2.0'
 	})
@@ -324,6 +326,18 @@ export const homepageLinks = {
 	"menu": [
 		{
 			"type": "dir",
+			"url": "Search/menu",
+			"id": "search-menu",
+			"i18n_info": {
+				"en": {"title": "Search menu"},
+				"cs": {"title": "Vyhledávaní"},
+				"sk": {"title": "Vyhľadávanie"}
+			},
+			"icon": "fa-solid fa-magnifying-glass",
+			'activeURLs': ['/Search']
+		},
+		{
+			"type": "dir",
 			"url": "/FMovies",
 			"id": "movies",
 			"i18n_info": {
@@ -332,7 +346,7 @@ export const homepageLinks = {
 				"sk": {"title": "Filmy"}
 			},
 			"icon": "fa-solid fa-film",
-			'activeURLs': ['/FTv','/Search/search-movie']
+			// 'activeURLs': ['/Search/search-movie']
 		},
 		{
 			"type": "dir",
@@ -344,7 +358,19 @@ export const homepageLinks = {
 				"sk": {"title": "Seriály"}
 			},
 			"icon": "fa-solid fa-tv",
-			'activeURLs': ['/Search/search-series']
+			// 'activeURLs': ['/Search/search-series']
+		},
+		{
+			"type": "dir",
+			"id": "tv",
+			"url": "/FTv/archiv",
+			"i18n_info": {
+				"en": {"title": "TV Program (14 days)"},
+				"cs": {"title": "TV Program (14 dní)"},
+				"sk": {"title": "TV Program (14 dní)"}
+			},
+			"icon": "fa-solid fa-tower-broadcast",
+			'activeURLs': ['/FTv']
 		},
 		{
 			"type": "dir",
@@ -390,16 +416,16 @@ export const homepageLinks = {
 		// 	},
 		// 	"icon": "fa-solid fa-volleyball"
 		// },
-		{
-			"type": "dir",
-			"url": "/Search/getList",
-			"i18n_info": {
-				"en": {"title": "Lists / Charts"},
-				"cs": {"title": "Seznamy / Řebríčky"},
-				"sk": {"title": "Zoznamy / Rebríčky"}
-			},
-			"icon": "fa-solid fa-list-ul"
-		},
+		// {
+		// 	"type": "dir",
+		// 	"url": "/Search/getList",
+		// 	"i18n_info": {
+		// 		"en": {"title": "Lists / Charts"},
+		// 		"cs": {"title": "Seznamy / Řebríčky"},
+		// 		"sk": {"title": "Zoznamy / Rebríčky"}
+		// 	},
+		// 	"icon": "fa-solid fa-list-ul"
+		// },
 		{
 			"type": "dir",
 			"id": "generator",
@@ -418,15 +444,6 @@ export const homepageLinks = {
 }
 
 export const moviesAdditionalLinks = [
-	{
-		"type": "dir",
-		"url": "/FTv/archiv",
-		"i18n_info": {
-			"en": {"title": "TV Program (14 days)"},
-			"cs": {"title": "TV Program (14 dní)"},
-			"sk": {"title": "TV Program (14 dní)"}
-		}
-	},
 	{
 		"type": "dir",
 		"url": "/FHDR",

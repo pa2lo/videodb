@@ -713,7 +713,8 @@ button:not(.basicIcon, .posterButton-info) :is(.fa-solid, .fa-regular, .fa-brand
 }
 .movieLink {
 	/* background-color: var(--bg1); */
-	padding: .75rem 1rem;
+	line-height: 1.25;
+	padding: .5rem 1rem;
 	cursor: pointer;
 	position: relative;
 	gap: .75rem;
@@ -725,6 +726,8 @@ button:not(.basicIcon, .posterButton-info) :is(.fa-solid, .fa-regular, .fa-brand
 }
 
 .movieLink-title {
+	min-height: 2rem;
+	place-content: center;
 	flex: 1;
 }
 
@@ -999,6 +1002,9 @@ button:not(.basicIcon, .posterButton-info) :is(.fa-solid, .fa-regular, .fa-brand
 	padding: .5rem 1.5rem;
 	gap: .75rem;
 }
+.downloadModal-episodeInfo {
+	border-top: 1px solid var(--border1);
+}
 .downloadModal-link {
 	cursor: pointer;
 	background-color: var(--bg3);
@@ -1010,7 +1016,7 @@ button:not(.basicIcon, .posterButton-info) :is(.fa-solid, .fa-regular, .fa-brand
 	border-bottom: 1px solid var(--border1);
 }
 .downloadModal-linkTitle, .downloadModal-episodeTitle {
-	gap: .5rem;
+	gap: .75rem;
 	min-height: 2rem;
 }
 .downloadModal-episodeTitle {
@@ -1019,8 +1025,22 @@ button:not(.basicIcon, .posterButton-info) :is(.fa-solid, .fa-regular, .fa-brand
 .downloadModal-linkTitle, .downloadModal-linkTitle-text, .downloadModal-episodeTitle {
 	flex: 1;
 }
-.downloadModal-streamInfoMobile {
+.downloadModal-linkTitle > .fa-solid {
+	width: 1rem;
+	text-align: center;
+	margin-left: -0.125rem;
+}
+/* .downloadModal-streamInfoMobile {
 	display: none;
+} */
+.downloadModal-linkTitle-info {
+	font-size: .875rem;
+	display: -webkit-box;
+	-webkit-box-orient: vertical;
+	-webkit-line-clamp: 1;
+	line-clamp: 1;
+	overflow: hidden;
+	line-height: 1.125rem;
 }
 .downloadModal-linkButtons {
 	display: flex;
@@ -1129,12 +1149,14 @@ button:not(.basicIcon, .posterButton-info) :is(.fa-solid, .fa-regular, .fa-brand
 	align-items: center;
 }
 .posters-cont {
-	scroll-behavior: smooth;
 	display: flex;
 	align-items: flex-start;
 	overflow: auto;
 	gap: 1.375rem var(--gridGap);
 	scrollbar-width: none;
+}
+.smoothScroll {
+	scroll-behavior: smooth;
 }
 .posters-cont::-webkit-scrollbar {
 	display: none;
@@ -1858,7 +1880,7 @@ button:not(.basicIcon, .posterButton-info) :is(.fa-solid, .fa-regular, .fa-brand
 		display: flex;
 	}
 
-	.downloadModal-streamInfoMobile, .pageTitle-textPre {
+	/* .downloadModal-streamInfoMobile,  */.pageTitle-textPre {
 		display: initial;
 	}
 
@@ -2015,6 +2037,7 @@ button:not(.basicIcon, .posterButton-info) :is(.fa-solid, .fa-regular, .fa-brand
 	background-color: #0006;
 }
 .theme-v2 .downloadModal-episodeInfo {
+	border-top: none;
 	margin-top: 0.25rem;
 	padding-right: 1.625rem;
 }
@@ -2023,7 +2046,6 @@ button:not(.basicIcon, .posterButton-info) :is(.fa-solid, .fa-regular, .fa-brand
 	min-height: 3rem;
 }
 .theme-v2 .movieLink-title {
-	line-height: 1.25;
 	display: -webkit-box;
 	line-clamp: 2;
 	-webkit-line-clamp: 2;

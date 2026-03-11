@@ -1,7 +1,7 @@
 <script setup>
 import { ref, shallowReactive, onBeforeMount, onBeforeUnmount, computed, watch, nextTick } from 'vue'
 
-import { fixRating, reformatString, slugify } from './helpers'
+import { fixRating, formatHMS, reformatString, slugify } from './helpers'
 import { t } from './labels'
 
 import BButton from './components/BButton.vue'
@@ -459,7 +459,7 @@ async function showDownload(link) {
 	})
 
 	try {
-		const data = await getProxyData(`${PLUGIN_URL}/${link.url}${link.url.includes('?') ? '&' : '?'}${getQueryParams()}`)
+		const data = await getProxyData(`${PLUGIN_URL}${link.url}${link.url.includes('?') ? '&' : '?'}${getQueryParams()}`)
 
 		if (data.strms?.length) {
 			data.strms.map(stream => {
@@ -993,7 +993,7 @@ async function getDownloadLink(url) {
 
 		downloadController = new AbortController()
 
-		const id = await getProxyData(`${PLUGIN_URL}/${url}?${getQueryParams()}`, downloadController.signal)
+		const id = await getProxyData(`${PLUGIN_URL}${url}?${getQueryParams()}`, downloadController.signal)
 
 		if (!id?.ident) {
 			downloadStreams.error = t('Error loading ID')
@@ -1015,7 +1015,7 @@ async function getDownloadLink(url) {
 			return false
 		}
 
-		return res.data.link
+		return res.data.link.replace(/:\/\/(.{1,2}\d{2})\./, "://l01.")
 	} catch (error) {
 		if (error?.name == 'TimeoutError') downloadStreams.show ? downloadStreams.error = t('Request timeout') : showToast(t('Request timeout'))
 		else if (error?.name != 'AbortError') {
@@ -1491,7 +1491,10 @@ function afterImport() {
 				<div v-else>
 					<div class="modalDownloadLinks">
 						<DownloadLink v-for="streamLink in downloadStreams.data.strms" :loading="downloadStreams.loadingLink == streamLink.url" class="isFocusable" :link="streamLink" :isSupportedOs :isDesktopOs :current="downloadStreams.current?.url == streamLink.url" @downloadFile="downloadFile" @copyFileLink="copyFileLink" @pointerenter="!ignoreMouseEvents && (downloadStreams.current = streamLink)">
-							<strong>{{ streamLink.size }}</strong> - {{ streamLink.quality }} <span class="light"><span class="downloadModal-streamInfoPC">{{ streamLink.vinfo }}{{ streamLink.ainfo }}</span><span class="downloadModal-streamInfoMobile">{{ streamLink.linfo?.join(', ').toUpperCase() }}</span></span>
+							<strong>{{ streamLink.size }}</strong> - {{ streamLink.quality }} - {{ streamLink?.lang }} <span class="light downloadModal-streamInfoPC">{{ streamLink.vinfo }}</span>
+							<div class="downloadModal-linkTitle-info light">
+								{{ formatHMS(streamLink.stream_info?.video?.duration) }}<span>{{ streamLink.ainfo }}</span>
+							</div>
 						</DownloadLink>
 					</div>
 					<div class="downloadModal-episodeInfo flex ai-c">

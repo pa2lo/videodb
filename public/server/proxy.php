@@ -62,6 +62,7 @@ if ($content == false) {
 	echo "HTTP Status Code: $httpCode\n";
     echo "Response content: $content\n";
     echo "cURL error: $error\n";
+	if (isset($_POST['data'])) echo "POST DATA: {$_POST['data']}\n";
     exit;
 }
 

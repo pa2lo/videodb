@@ -36,7 +36,7 @@ onMounted(async () => {
 
 		loading.value = true
 
-		const page = await getProxyData(`${PLUGIN_URL}/Last?${getQueryParams()}`, null, new URLSearchParams({ids: `[${list}]`}).toString(), () => {
+		const page = await getProxyData(`${PLUGIN_URL}/Search/getTrakt?limit=10&od=desc&of=mindate${getQueryParams()}`, null, new URLSearchParams({ids: `[${list}]`}).toString(), () => {
 			loading.value = true
 		})
 
@@ -107,12 +107,16 @@ function getLinkData(link, index) {
 	}
 }
 
+const smoothScroll = ref(false)
 let ignoreMouseEnter = false
 function beforeListLeave() {
 	ignoreMouseEnter = true
 }
 function afterListEnter() {
-	ignoreMouseEnter = false
+	requestAnimationFrame(() => {
+		smoothScroll.value = true
+		ignoreMouseEnter = false
+	})
 }
 </script>
 
@@ -122,7 +126,7 @@ function afterListEnter() {
 		<Transition appear name="layout" mode="out-in" @enter="onPostersEnter" @beforeLeave="beforeListLeave" @afterEnter="afterListEnter">
 			<div v-if="loading" class="hpWidget-loader"><i class="fa-solid fa-spinner fa-spin-pulse fa-4x"></i></div>
 			<div v-else-if="content" class="posters-contOuter" :class="grid ? 'posters-contOuter-grid' : 'posters-contOuter-slider'">
-				<div class="posters-cont" :class="[grid ? 'postersGrid' : 'postersSlider scroller isHorizontal isFocusable' ,{isCurrent: !grid && currentItemInfo?.hoverId?.startsWith(id)}]" @itementer="scrollerItemEnter" ref="scrollerEl" @scroll="onScrollerScroll">
+				<div class="posters-cont" :class="[grid ? 'postersGrid' : 'postersSlider scroller isHorizontal isFocusable' ,{isCurrent: !grid && currentItemInfo?.hoverId?.startsWith(id), smoothScroll}]" @itementer="scrollerItemEnter" ref="scrollerEl" @scroll="onScrollerScroll">
 					<template v-for="(link, linkIndex) in content.menu">
 						<div
 							v-if="link.type != 'next'"
