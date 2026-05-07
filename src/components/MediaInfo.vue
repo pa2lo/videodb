@@ -72,9 +72,9 @@ const showPoster = computed(() => {
 			<slot></slot>
 			<BButton v-if="favItems.some(fav => fav.id == currentItemInfo.id)" dark icon="fa-solid fa-heart" :title="t('Remove from favorites')" @click="$emit('toggleFav')" />
 			<BButton v-else dark icon="fa-regular fa-heart" :title="t('Add to favorites')" @click="$emit('toggleFav')" :disabled="isGeneratorSubpage" />
-			<BButton v-if="currentItemInfo.url && downloadHistory.includes(currentItemInfo.url.split('?')[0])" dark icon="fa-solid fa-check" :title="t('Remove from watch list')" @click="$emit('removeFromDownloadHistory', currentItemInfo.url.split('?')[0])" />
-			<BButton v-else-if="currentPage?.data?.system?.setContent == 'seasons' && currentItemInfo?.url && downloadHistory.some(hitem => hitem.includes(`/Play/${currentItemInfo?.id}/${currentItemInfo?.info?.season}/`))" dark icon="fa-solid fa-check" :title="t('Remove from watch list')" disabled />
-			<BButton v-else-if="currentPage?.data?.system?.setContent != 'seasons' && currentItemInfo?.type == 'dir' && currentItemInfo.url && downloadHistory.some(hitem => hitem.includes(`/Play/${currentItemInfo?.id}/`))" dark icon="fa-solid fa-check" :title="t('Remove from watch list')" disabled />
+			<BButton v-if="currentItemInfo.sc_history_link && downloadHistory.includes(currentItemInfo.sc_history_link)" dark icon="fa-solid fa-check" :title="t('Remove from watch list')" @click="$emit('removeFromDownloadHistory', currentItemInfo.sc_history_link)" />
+			<BButton v-else-if="currentPage?.data?.system?.setContent == 'seasons' && currentItemInfo?.url && downloadHistory.some(hitem => hitem.includes(`/sc/${currentItemInfo?.id}/${currentItemInfo?.info?.season}/`))" dark icon="fa-solid fa-check" :title="t('Remove from watch list')" disabled />
+			<BButton v-else-if="currentPage?.data?.system?.setContent != 'seasons' && currentItemInfo?.type == 'dir' && currentItemInfo.url && downloadHistory.some(hitem => hitem.includes(`/sc/${currentItemInfo?.id}/`))" dark icon="fa-solid fa-check" :title="t('Remove from watch list')" disabled />
 			<BButton v-if="showArrows" class="ml-a" dark icon="fa-solid fa-chevron-left" :disabled="currentItemInfo?.isFirst" :title="t('Previous video')" @click="$emit('findNextMedia', false)" />
 			<BButton v-if="showArrows" dark icon="fa-solid fa-chevron-right" :disabled="currentItemInfo?.isLast" :title="t('Next video')" @click="$emit('findNextMedia', true)" />
 		</div>

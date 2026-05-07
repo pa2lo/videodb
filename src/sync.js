@@ -5,13 +5,14 @@ const DOWNLOAD_SERVICE_URL = import.meta.env.VITE_DOWNLOAD_SERVICE_URL
 
 export const sync = {
 	checkInterval: null,
-	async sendData(action, body) {
+	async sendData(url, method, body) {
 		syncing.value = true
 		syncError.value = ''
 		try {
-			const response = await fetch(`${DOWNLOAD_SERVICE_URL}/sync.php?action=${action}`, {
-				method: 'POST',
-				body: new URLSearchParams(body),
+			const response = await fetch(`${DOWNLOAD_SERVICE_URL}/sync${url}`, {
+				method: method,
+				headers: {'Content-Type': 'application/json'},
+				body: body ? JSON.stringify(body) : null,
 				signal: AbortSignal.timeout(10000)
 			})
 			const data = await response.json()
@@ -34,10 +35,10 @@ export const sync = {
 		})
 	},
 	async newSync() {
-		const res = await this.sendData('create', {
-			history: this.getStringifiedData('history'),
-			favs: this.getStringifiedData('favs'),
-			bookmarks: this.getStringifiedData('bookmarks')
+		const res = await this.sendData('', 'POST', {
+			history: downloadHistory.value,
+			favs: favItems.value,
+			bookmarks: bookmarks.value
 		})
 
 		if (res.success && res.data?.id) {
@@ -51,18 +52,15 @@ export const sync = {
 	async update(param) {
 		if (!syncKey.value) return
 
-		const res = await this.sendData('update', {
-			id: syncKey.value,
+		const res = await this.sendData(`/${syncKey.value}`, 'PATCH', {
 			param: param,
-			data: this.getStringifiedData(param)
+			data: this.getArr(param)
 		})
 
 		if (res?.data?.ts) syncTS.value = res.data.ts
 	},
 	async connect(id, isNewKey) {
-		const res = await this.sendData('connect', {
-			id
-		})
+		const res = await this.sendData(`/${id}`, 'GET')
 
 		if (res?.success && res.data?.id) {
 			if (res.data.history) downloadHistory.value = res.data.history
@@ -94,9 +92,7 @@ export const sync = {
 		}, 300000)
 	},
 	async checkTS() {
-		const res = await this.sendData('check', {
-			id: syncKey.value
-		})
+		const res = await this.sendData(`/${syncKey.value}/check`, 'GET')
 
 		if (!res.success || !res.data?.updated) {
 			syncError.value = 'Sync error'
@@ -107,10 +103,10 @@ export const sync = {
 
 		if (res.data?.updated > syncTS.value) this.connect(syncKey.value)
 	},
-	getStringifiedData(param) {
-		if (param == 'history') return JSON.stringify(downloadHistory.value)
-		else if (param == 'favs') return JSON.stringify(favItems.value)
-		else if (param == 'bookmarks') return JSON.stringify(bookmarks.value)
+	getArr(param) {
+		if (param == 'history') return downloadHistory.value
+		else if (param == 'favs') return favItems.value
+		else if (param == 'bookmarks') return bookmarks.value
 	},
 	resetSync() {
 		syncKey.value = ''

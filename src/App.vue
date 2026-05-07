@@ -1,7 +1,7 @@
 <script setup>
 import { ref, shallowReactive, onBeforeMount, onBeforeUnmount, computed, watch, nextTick } from 'vue'
 
-import { fixRating, formatHMS, reformatString, slugify } from './helpers'
+import { fixRating, setHistoryIDs, formatHMS, reformatString, slugify } from './helpers'
 import { t } from './labels'
 
 import BButton from './components/BButton.vue'
@@ -57,6 +57,7 @@ const downloadStreams = shallowReactive({
 	show: false,
 	loading: true,
 	link: null,
+	sc_history_link: null,
 	data: null,
 	error: '',
 	current: null,
@@ -79,6 +80,8 @@ const searchData = shallowReactive({
 
 const generatorShowsData = shallowReactive({
 	loading: false,
+	season: null,
+	ep: null,
 	show: null,
 	epname: null,
 	epUrl: null,
@@ -344,6 +347,7 @@ async function getUrlContent(url, customUrl) {
 		return false
 	} else if (page?.menu) {
 		fixRating(page.menu)
+		setHistoryIDs(page.menu)
 
 		if (page.system?.setContent === 'movies') page.menu = page.menu.filter((item, index, arr) => arr.findIndex(x => (x.id || x.url) === (item.id || item.url)) === index)
 		else if (page.system?.setContent === 'episodes') page.menu = page.menu.filter((item, index, arr) => arr.findIndex(x => x.url === item.url) === index)
@@ -429,13 +433,13 @@ function reportFetchError(error) {
 // download
 async function getShortenedLink(link) {
 	try {
-		let res = await fetch(`${DOWNLOAD_SERVICE_URL}/shorten.php`, {
+		let res = await fetch(`${DOWNLOAD_SERVICE_URL}/api/shorten`, {
 			method: 'POST',
 			body: new URLSearchParams({link})
 		})
 		let resJSON = await res.json()
 
-		if (resJSON.success && resJSON.id) return `${SITE_URL}/server/r/${resJSON.id}`
+		if (resJSON.success && resJSON.id) return `${DOWNLOAD_SERVICE_URL}/r/${resJSON.id}`
 		return link
 	} catch (error) {
 		console.log(error)
@@ -451,6 +455,7 @@ async function showDownload(link) {
 	Object.assign(downloadStreams, {
 		loading: true,
 		link: link.url,
+		sc_history_link: link?.sc_history_link || null,
 		data: null,
 		error: '',
 		current: null,
@@ -479,10 +484,9 @@ async function downloadFile(stream, playLink, enqueue, castToDevice) {
 	if (downloadStreams.show) {
 		if (downloadStreams.loadingLink == stream.url) return
 
-		requestAnimationFrame(() => {
-			downloadStreams.error = ''
-			downloadStreams.loadingLink = stream.url
-		})
+		downloadStreams.error = ''
+		await nextTick()
+		downloadStreams.loadingLink = stream.url
 	}
 
 	let newLink = await getDownloadLink(stream.url)
@@ -507,9 +511,9 @@ async function downloadFile(stream, playLink, enqueue, castToDevice) {
 
 	if (downloadStreams.show) downloadStreams.loadingLink = ''
 
-	if (downloadStreams.link && downloadHistory.value[downloadHistory.value.length - 1] != downloadStreams.link) {
-		if (downloadHistory.value.includes(downloadStreams.link)) downloadHistory.value.splice(downloadHistory.value.indexOf(downloadStreams.link), 1)
-		downloadHistory.value.push(downloadStreams.link.split('?')[0])
+	if (downloadStreams.sc_history_link && downloadHistory.value[downloadHistory.value.length - 1] != downloadStreams.sc_history_link) {
+		if (downloadHistory.value.includes(downloadStreams.sc_history_link)) downloadHistory.value.splice(downloadHistory.value.indexOf(downloadStreams.sc_history_link), 1)
+		downloadHistory.value.push(downloadStreams.sc_history_link)
 		sync.update('history')
 	}
 }
@@ -629,6 +633,8 @@ async function getRandomShowsEpisode(ignoreHistory) {
 	if (generatorShowsHistory.value.some(hitem => hitem.epUrl == episode.url)) return getRandomShowsEpisode(true)
 
 	generatorShowsData.show = showId
+	generatorShowsData.season = episode?.info?.season
+	generatorShowsData.ep = episode?.info?.episode
 	generatorShowsData.epname = `${String(episode?.info?.season || 0).padStart(2, 0)}x${String(episode?.info?.episode).padStart(2, 0)} - ${episode?.i18n_info[lang.value]?.epname}`
 	generatorShowsData.epUrl = episode.url
 	generatorShowsData.loading = false
@@ -658,6 +664,7 @@ async function generatorCopyFileLink(link) {
 }
 async function generatorDownloadFile(link, playLink = false, enqueue = false) {
 	downloadStreams.link = link.epUrl
+	downloadStreams.sc_history_link = `/sc/${link.show}/${link.season}/${link.ep}`
 	const url = await getEpisodeDownloadLink(link.epUrl)
 	downloadFile({url}, playLink, enqueue)
 	pushGeneratorHistoryItem(link)
@@ -790,8 +797,8 @@ function destroyTrailer() {
 }
 
 // login logout
-onBeforeMount(() => {
-	runUpdater()
+onBeforeMount(async () => {
+	await runUpdater()
 
 	onInit()
 
@@ -885,17 +892,17 @@ async function getDownloadToken(session_id) {
 
 		const newLink = fileDownloadJSON.data.link.replace(/:\/\/(.{1,2}\d{2})\./, "://b01.")
 
-		const tokenData = await fetch(`${DOWNLOAD_SERVICE_URL}/getTokenContent.php`, {
+		const tokenData = await fetch(`${DOWNLOAD_SERVICE_URL}/api/getTokenContent`, {
 			method: 'POST',
 			body: new URLSearchParams({ url: newLink })
 		})
 		if (tokenData.status != 200) return false
 
-		const tokenDataTEXT = await tokenData.text()
+		const tokenDataTEXT = await tokenData.json()
 
-		if (!tokenDataTEXT) return false
+		if (!tokenDataTEXT.success || !tokenDataTEXT.token) return false
 
-		return tokenDataTEXT
+		return tokenDataTEXT.token
 	} catch (error) {
 		console.log(error)
 		return false
@@ -913,6 +920,7 @@ async function onInit() {
 
 		if (userInfoDataJSON?.data?.days_left > 0) {
 			appState.initLoad = false
+			if (userInfoDataJSON?.data?.days_left < 15) showToast(`Predplatne vyprsi o ${userInfoDataJSON?.data?.days_left} dni`)
 			return getHomePage(false, true)
 		} else logout()
 	}
@@ -957,7 +965,38 @@ function setCurrentItemInfoGrid(e, link) {
 }
 
 // helpers
-function runUpdater() {
+async function updateDownloadHistory() {
+	try {
+		const ids = downloadHistory.value.reduce((acc, item) => {
+			let id = item.split('/')[2]
+			if (id) acc.push(id)
+			return acc
+		}, [])
+
+		if (ids.length) {
+			let res = await fetch(`${DOWNLOAD_SERVICE_URL}/api/getIDs`, {
+				headers: { "Content-Type": "application/json" },
+				method: 'POST',
+				body: JSON.stringify({ids})
+			})
+
+			let data = await res.json()
+
+			if (data.success && data.data) {
+				let newHistory = downloadHistory.value.reduce((acc, i) => {
+					let originalID = i.split('/')[2]
+					if (data.data[originalID]) acc.push(i.replace(`/Play/${originalID}`, `/sc/${data.data[originalID]}`))
+					return acc
+				}, [])
+				downloadHistory.value = newHistory
+				showToast('History updated', 'check')
+			}
+		}
+	} catch (error) {
+		console.log(error)
+	}
+}
+async function runUpdater() {
 	// Update 05/25
 	if (localStorage.getItem('seriesHistory')) localStorage.removeItem('seriesHistory')
 	if (localStorage.getItem('moviesHistory')) localStorage.removeItem('moviesHistory')
@@ -979,6 +1018,9 @@ function runUpdater() {
 
 	// Update 10/25
 	if (localStorage.getItem('tokenDate')) localStorage.removeItem('tokenDate')
+
+	// update 04/26
+	if (!syncKey.value && downloadHistory.value.some(i => i.startsWith('/Play/'))) await updateDownloadHistory()
 }
 function getCurrentFocusableItem() {
 	return mainEl.value.querySelector('.isCurrentLR') || mainEl.value.querySelector('.isCurrent')
@@ -995,15 +1037,38 @@ async function getDownloadLink(url) {
 
 		const id = await getProxyData(`${PLUGIN_URL}${url}?${getQueryParams()}`, downloadController.signal)
 
-		if (!id?.ident) {
+		if (!id?.ident || !id?.version) {
 			downloadStreams.error = t('Error loading ID')
 			return false
 		}
 
+		let ident = null;
+
+		if (id?.version) {
+			if (id.version == 0 && id?.v0) ident = id.v0
+			else if (id.version == 1 && id?.v1) {
+				try {
+					let res = await fetch(`${DOWNLOAD_SERVICE_URL}/api/scIdentV1`, {
+						method: 'POST',
+						body: new URLSearchParams({hash: id.v1})
+					})
+					let resJSON = await res.json()
+
+					if (resJSON?.success && resJSON?.ident) ident = resJSON.ident
+					else return false
+				} catch (error) {
+					console.log(error)
+					return false
+				}
+			}
+		}
+
+		if (!ident) return false
+
 		const options = {
 			method: 'POST',
 			headers: {'Content-Type': 'application/json'},
-			body: `{"session_id":"${token.value}","data":{"ident":"${id.ident}"}}`,
+			body: `{"session_id":"${token.value}","data":{"ident":"${ident}"}}`,
 			signal: abortSignalAny([downloadController.signal, AbortSignal.timeout(10000)])
 		}
 
@@ -1067,7 +1132,7 @@ function getSearchUrl(type, value) {
 function onInfoKeydown(e) {
 	if (e.code == 'KeyC' && !e.metaKey && !e.ctrlKey) showMovieDBSite('csfd', currentItemInfo.value?.unique_ids?.csfd)
 	else if (e.code == 'KeyM') showMovieDBSite('imdb', currentItemInfo.value?.unique_ids?.imdb)
-	else if (e.code == 'KeyW') removeFromDownloadHistory(currentItemInfo.value?.url)
+	else if (e.code == 'KeyW') removeFromDownloadHistory(currentItemInfo.value?.sc_history_link)
 	else if (e.code == 'KeyF') toggleFav()
 	else if (e.code == 'ArrowRight' || e.code == 'ArrowLeft') findNextMedia(e.code == 'ArrowRight')
 	else if (e.key == 'Enter') showDownload(currentItemInfo.value)
@@ -1086,7 +1151,7 @@ function onMainKeydown(e) {
 		else if (e.code == 'KeyB' && !e.metaKey && !e.ctrlKey) toggleBookmark()
 		else if (e.code == 'KeyC' && !e.metaKey && !e.ctrlKey) showMovieDBSite('csfd', currentItemInfo.value?.unique_ids?.csfd)
 		else if (e.code == 'KeyM') showMovieDBSite('imdb', currentItemInfo.value?.unique_ids?.imdb)
-		else if (e.code == 'KeyW') removeFromDownloadHistory(currentItemInfo.value?.url)
+		else if (e.code == 'KeyW') removeFromDownloadHistory(currentItemInfo.value?.sc_history_link)
 		else if (e.code == 'KeyF') toggleFav()
 		else if (e.key == 'Enter') mainCurrentClick()
 		else if (e.code == 'ArrowDown' || e.code == 'ArrowUp') findNextFocusableItem(e.code == 'ArrowDown')
@@ -1100,7 +1165,7 @@ function onDownloadModalKeydown(e) {
 		e.preventDefault()
 		setNextStreamAsCurrent(e.code == 'ArrowDown')
 	} else if (currentPage.value?.data?.system?.setContent == 'episodes' && (e.code == 'ArrowRight' || e.code == 'ArrowLeft')) findNextMedia(e.code == 'ArrowRight', true)
-	else if (e.code == 'KeyW') removeFromDownloadHistory(currentItemInfo.value?.url)
+	else if (e.code == 'KeyW') removeFromDownloadHistory(currentItemInfo.value?.sc_history_link)
 	else if (downloadStreams.current) {
 		if (e.key == 'Enter') downloadFile(downloadStreams.current, isSupportedOs)
 		else if (e.code == 'KeyQ' && isDesktopOs) downloadFile(downloadStreams.current, true, true)
@@ -1309,9 +1374,9 @@ function afterImport() {
 										<BButton  v-if="link.type != 'next'" class="posterButton-info" :class="{'movieLink-mobileLi-mobile': videoLayout == 'infoGrid'}" icon="fa-solid fa-info" @click.stop="showCurrentItemInfo(link)" />
 										<BButton  v-if="videoLayout == 'infoGrid' && link.type != 'next'" class="posterButton-info movieLink-mobileLi-tabled" icon="fa-solid fa-info" @click.stop="link?.url != currentItemInfo?.url ? setCurrentItemInfo(link) : false" />
 										<i v-if="link.id && ['movies', 'tvshows'].includes(currentPage?.data?.system?.setContent) && favItems.some(fav => fav.id == link.id)" class="poster-loved fa-solid fa-heart"></i>
-										<i v-if="link?.type == 'video' && link?.url && downloadHistory.includes(link.url.split('?')[0])" class="poster-viewed fa-solid fa-check"></i>
-										<i v-else-if="currentPage?.data?.system?.setContent == 'seasons' && link?.url && downloadHistory.some(hitem => hitem.includes(`/Play/${link?.id}/${link?.info?.season}/`))" class="poster-viewed fa-solid fa-check"></i>
-										<i v-else-if="currentPage?.data?.system?.setContent != 'seasons' && link?.type == 'dir' && link.url && downloadHistory.some(hitem => hitem.includes(`/Play/${link?.id}/`))" class="poster-viewed fa-solid fa-check"></i>
+										<i v-if="link?.type == 'video' && link?.sc_history_link && downloadHistory.includes(link.sc_history_link)" class="poster-viewed fa-solid fa-check"></i>
+										<i v-else-if="currentPage?.data?.system?.setContent == 'seasons' && link?.url && downloadHistory.some(hitem => hitem.includes(`/sc/${link?.id}/${link?.info?.season}/`))" class="poster-viewed fa-solid fa-check"></i>
+										<i v-else-if="currentPage?.data?.system?.setContent != 'seasons' && link?.type == 'dir' && link.url && downloadHistory.some(hitem => hitem.includes(`/sc/${link?.id}/`))" class="poster-viewed fa-solid fa-check"></i>
 									</div>
 									<div class="poster-text">
 										<div class="poster-title" v-html="reformatString(link.i18n_info[lang].title)" />
@@ -1327,9 +1392,9 @@ function afterImport() {
 							<template v-for="link in currentPage.data.sortedMenu">
 								<div v-if="!link.action" class="movieLink isFocusable flex ai-c" :class="{isCurrent: currentItemInfo && currentItemInfo.url == link.url}" @click="showDownload(link)" @pointerenter="!ignoreMouseEvents && setCurrentItemInfo(link)" @itementer="setCurrentItemInfo(link, true)">
 									<span class="movieLink-title" v-html="reformatString(link.i18n_info[lang].title)"></span>
-									<i v-if="link?.type == 'video' && link?.url && downloadHistory.includes(link.url.split('?')[0])" class="fa-solid fa-check"></i>
-									<i v-else-if="currentPage?.data?.system?.setContent == 'seasons' && link?.url && downloadHistory.some(hitem => hitem.includes(`/Play/${link?.id}/${link?.info?.season}/`))" class="fa-solid fa-check"></i>
-									<i v-else-if="currentPage?.data?.system?.setContent != 'seasons' && link?.type == 'dir' && link.url && downloadHistory.some(hitem => hitem.includes(`/Play/${link?.id}/`))" class="fa-solid fa-check"></i>
+									<i v-if="link?.type == 'video' && link?.sc_history_link && downloadHistory.includes(link.sc_history_link)" class="fa-solid fa-check"></i>
+									<i v-else-if="currentPage?.data?.system?.setContent == 'seasons' && link?.url && downloadHistory.some(hitem => hitem.includes(`/sc/${link?.id}/${link?.info?.season}/`))" class="fa-solid fa-check"></i>
+									<i v-else-if="currentPage?.data?.system?.setContent != 'seasons' && link?.type == 'dir' && link.url && downloadHistory.some(hitem => hitem.includes(`/sc/${link?.id}/`))" class="fa-solid fa-check"></i>
 									<i v-if="link.id && ['movies', 'tvshows'].includes(currentPage?.data?.system?.setContent) && favItems.some(fav => fav.id == link.id)" class="fa-solid fa-heart"></i>
 									<span v-if="link?.info?.rating" class="movieLink-rating" :class="{isAverage: link?.info?.rating < 7.5 && link?.info?.rating > 4, isBad: link?.info?.rating <= 4}"></span>
 									<div class="movieLink-mobileLi movieLink-mobileLi-mobile" v-if="link.type != 'next'" @click.stop="showCurrentItemInfo(link)">
@@ -1480,7 +1545,7 @@ function afterImport() {
 			</BModal>
 			<BModal v-model:open="downloadStreams.show" :title="t('Select stream')" @keydown="onDownloadModalKeydown">
 				<template #buttons>
-					<BButton v-if="downloadStreams.link && downloadHistory.includes(downloadStreams.link.split('?')[0])" class="modal-button" icon="fa-solid fa-check" :title="t('Remove from watch list')" @click="removeFromDownloadHistory(downloadStreams.link.split('?')[0])" />
+					<BButton v-if="downloadStreams.sc_history_link && downloadHistory.includes(downloadStreams.sc_history_link)" class="modal-button" icon="fa-solid fa-check" :title="t('Remove from watch list')" @click="removeFromDownloadHistory(downloadStreams.sc_history_link)" />
 				</template>
 				<Transition name="maxHeight">
 					<div v-if="downloadStreams.error" class="loginBox-error modal-error">

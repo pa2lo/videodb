@@ -4,7 +4,7 @@ import { ref, onMounted } from 'vue'
 import BButton from './BButton.vue'
 
 import { lang, getQueryParams, downloadHistory, favItems, widgetsMap, currentItemInfo, ignoreMouseEvents } from '@/store'
-import { fixRating, getProxyData } from '@/helpers'
+import { fixRating, setHistoryIDs, getProxyData } from '@/helpers'
 
 const PLUGIN_URL = import.meta.env.VITE_PLUGIN_URL
 const DEFAULT_POSTER = import.meta.env.VITE_DEFAULT_POSTER
@@ -36,12 +36,13 @@ onMounted(async () => {
 
 		loading.value = true
 
-		const page = await getProxyData(`${PLUGIN_URL}/Search/getTrakt?limit=10&od=desc&of=mindate${getQueryParams()}`, null, new URLSearchParams({ids: `[${list}]`}).toString(), () => {
+		const page = await getProxyData(`${PLUGIN_URL}/cachedData?type=ids`, null, list, () => {
 			loading.value = true
 		})
 
 		if (page?.menu?.length) {
 			fixRating(page.menu)
+			setHistoryIDs(page.menu)
 			content.value = page
 		}
 
@@ -57,7 +58,10 @@ onMounted(async () => {
 
 	page.menu.length = 30
 
-	if (page.menu?.length) fixRating(page.menu)
+	if (page.menu?.length) {
+		fixRating(page.menu)
+		setHistoryIDs(page.menu)
+	}
 
 	content.value = page
 	if (loading.value == true) loading.value = false
@@ -151,8 +155,8 @@ function afterListEnter() {
 									<i v-if="link.id && favItems.some(fav => fav.id == link.id)" class="poster-loved fa-solid fa-heart"></i>
 								</template>
 								<template v-if="!['wm-last', 'ws-last'].includes(id) && link?.url">
-									<i v-if="link?.type == 'video' && downloadHistory.includes(link.url)" class="poster-viewed fa-solid fa-check"></i>
-									<i v-else-if="link?.type == 'dir' && downloadHistory.some(hitem => hitem.includes(`/Play/${link?.id}/`))" class="poster-viewed fa-solid fa-check"></i>
+									<i v-if="link?.type == 'video' && link.sc_history_link && downloadHistory.includes(link.sc_history_link)" class="poster-viewed fa-solid fa-check"></i>
+									<i v-else-if="link?.type == 'dir' && downloadHistory.some(hitem => hitem.includes(`/sc/${link?.id}/`))" class="poster-viewed fa-solid fa-check"></i>
 								</template>
 							</div>
 							<div class="poster-text">

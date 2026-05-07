@@ -32,6 +32,15 @@ export function fixRating(arr) {
 		if (item.info?.rating && item.info.rating > 0 && item.info.rating < 1) item.info.rating = parseFloat((item.info.rating * 10).toFixed(2))
 	})
 }
+export function setHistoryIDs(arr) {
+	return arr.map((item, index, arr) => {
+		if (item?.type == 'video') {
+			let historyString = `/sc/${item.id}`
+			if (item?.info?.season && item?.info?.episode) historyString += `/${item.info.season}/${item.info.episode}`
+			item.sc_history_link = historyString
+		}
+	})
+}
 
 const DOWNLOAD_SERVICE_URL = import.meta.env.VITE_DOWNLOAD_SERVICE_URL
 import { downloadToken, uid } from "./store"
@@ -58,19 +67,27 @@ export async function getProxyData(url, abortSignal = null, body = null, loader 
 	try {
 		if (loader) loader()
 
-		const response = await fetch(`${DOWNLOAD_SERVICE_URL}/proxy.php`, {
+		const response = await fetch(`${DOWNLOAD_SERVICE_URL}/proxy`, {
 			method: 'POST',
 			body: new URLSearchParams(params),
 			signal: abortSignal ? abortSignalAny([abortSignal, AbortSignal.timeout(10000)]) : AbortSignal.timeout(10000)
 		})
 		const data = await response.json()
 
-		requestCache[cacheKey] = {
-			data: data,
-			ts: Date.now()
-		}
+		if (!data || data?.httpCode == 500) {
+			console.log('NO DATA')
+			return null
+		} else if (response.status != 200) {
+			console.log(`ERROR - ${response.status}`)
+			return null
+		} else {
+			requestCache[cacheKey] = {
+				data: data,
+				ts: Date.now()
+			}
 
-		return JSON.parse(JSON.stringify(data))
+			return JSON.parse(JSON.stringify(data))
+		}
 	} catch (error) {
 		console.log(error)
 		return null
